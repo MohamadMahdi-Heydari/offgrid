@@ -1,4 +1,38 @@
-export default function NewTopicPage() {
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+
+export default async function NewTopicPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const emailConfirmedAt = (user as { email_confirmed_at?: string | null }).email_confirmed_at;
+
+  if (!emailConfirmedAt) {
+    return (
+      <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+        <section className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-6">
+          <h1 className="text-2xl font-bold text-amber-200">ایمیلت رو تأیید کن</h1>
+          <p className="mt-2 text-sm text-amber-100">
+            برای ساخت تاپیک جدید، اول باید ایمیلت تأیید شده باشه. بعد از تأیید، همین صفحه فرم کامل ایجاد تاپیک رو نشون می‌ده.
+          </p>
+          <Link
+            href={`/verify-email?email=${encodeURIComponent(user.email ?? "")}`}
+            className="mt-4 inline-flex h-10 items-center rounded-xl bg-amber-500 px-4 text-sm font-semibold text-zinc-950 transition-all hover:bg-amber-400"
+          >
+            رفتن به صفحه تأیید ایمیل
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
       <section className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6">
