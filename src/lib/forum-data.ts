@@ -1,4 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
+import { createClient } from "@supabase/supabase-js";
 import { db } from "@/db";
 import { categories, profiles, topics } from "@/db/schema";
 
@@ -66,49 +67,67 @@ function normalizeTopic(row: {
   };
 }
 
+function createSupabasePublicClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error("Missing Supabase public environment variables.");
+  }
+
+  return createClient(url, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
 export async function getOrderedCategories() {
   try {
-    const rows = await db
-      .select({
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-        icon: categories.icon,
-        order: categories.order,
-        description: categories.description,
-      })
-      .from(categories)
-      .where(sql`${categories.order} > 0`)
-      .orderBy(categories.order);
+    const supabase = createSupabasePublicClient();
 
-    console.log("CATEGORIES DEBUG:", { count: rows.length, first: rows[0] ?? null });
+    const { data, error } = await supabase
+      .from("categories")
+      .select("id,name,slug,icon,description,order")
+      .gt("order", 0)
+      .order("order", { ascending: true });
 
-    return rows as CategoryNavItem[];
+    console.log("CATEGORIES DEBUG:", { data, error, count: data?.length });
+
+    if (error) {
+      return [] as CategoryNavItem[];
+    }
+
+    return (data ?? []) as CategoryNavItem[];
   } catch (error) {
     console.log("CATEGORIES DEBUG:", {
-      count: 0,
+      data: null,
       error: error instanceof Error ? error.message : "unknown error",
+      count: 0,
     });
+
     return [] as CategoryNavItem[];
   }
 }
 
 export async function getCategoryBySlug(slug: string) {
   try {
-    const rows = await db
-      .select({
-        id: categories.id,
-        name: categories.name,
-        slug: categories.slug,
-        icon: categories.icon,
-        order: categories.order,
-        description: categories.description,
-      })
-      .from(categories)
-      .where(and(eq(categories.slug, slug), sql`${categories.order} > 0`))
-      .limit(1);
+    const supabase = createSupabasePublicClient();
 
-    return (rows[0] as CategoryNavItem | undefined) ?? null;
+    const { data, error } = await supabase
+      .from("categories")
+      .select("id,name,slug,icon,description,order")
+      .eq("slug", slug)
+      .gt("order", 0)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      return null;
+    }
+
+    return (data as CategoryNavItem | null) ?? null;
   } catch {
     return null;
   }
