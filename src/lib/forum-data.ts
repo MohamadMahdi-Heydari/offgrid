@@ -1,7 +1,6 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, profiles, topics } from "@/db/schema";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type CategoryNavItem = {
   id: string;
@@ -69,42 +68,47 @@ function normalizeTopic(row: {
 
 export async function getOrderedCategories() {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("categories")
-      .select("id,name,slug,icon,description,order")
-      .gt("order", 0)
-      .order("order", { ascending: true });
+    const rows = await db
+      .select({
+        id: categories.id,
+        name: categories.name,
+        slug: categories.slug,
+        icon: categories.icon,
+        order: categories.order,
+        description: categories.description,
+      })
+      .from(categories)
+      .where(sql`${categories.order} > 0`)
+      .orderBy(categories.order);
 
-    console.log("CATEGORIES DEBUG:", { data, error, count: data?.length });
+    console.log("CATEGORIES DEBUG:", { count: rows.length, first: rows[0] ?? null });
 
-    if (error) {
-      return [] as CategoryNavItem[];
-    }
-
-    return (data ?? []) as CategoryNavItem[];
+    return rows as CategoryNavItem[];
   } catch (error) {
-    console.log("CATEGORIES DEBUG:", { data: null, error, count: 0 });
+    console.log("CATEGORIES DEBUG:", {
+      count: 0,
+      error: error instanceof Error ? error.message : "unknown error",
+    });
     return [] as CategoryNavItem[];
   }
 }
 
 export async function getCategoryBySlug(slug: string) {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("categories")
-      .select("id,name,slug,icon,description,order")
-      .eq("slug", slug)
-      .gt("order", 0)
-      .limit(1)
-      .maybeSingle();
+    const rows = await db
+      .select({
+        id: categories.id,
+        name: categories.name,
+        slug: categories.slug,
+        icon: categories.icon,
+        order: categories.order,
+        description: categories.description,
+      })
+      .from(categories)
+      .where(and(eq(categories.slug, slug), sql`${categories.order} > 0`))
+      .limit(1);
 
-    if (error) {
-      return null;
-    }
-
-    return (data as CategoryNavItem | null) ?? null;
+    return (rows[0] as CategoryNavItem | undefined) ?? null;
   } catch {
     return null;
   }
