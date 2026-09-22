@@ -253,6 +253,12 @@ async function syncReactionCounts(targetType: "topic" | "reply", targetId: strin
 
 export async function toggleReactionAction(formData: FormData) {
   try {
+    console.log("[TOGGLE REACTION]", {
+      target_type: formData.get("target_type"),
+      target_id: formData.get("target_id"),
+      value: formData.get("value"),
+    });
+
     const supabase = await createClient();
     const userResult = await supabase.auth.getUser();
     const user = userResult.data.user;
@@ -281,19 +287,46 @@ export async function toggleReactionAction(formData: FormData) {
       .maybeSingle();
 
     if (!existingReaction) {
-      const { error } = await supabase.from("reactions").insert({
+      const result = await supabase.from("reactions").insert({
         user_id: user.id,
         target_type: targetType,
         target_id: targetId,
         value,
       });
-      if (error) console.error("toggleReactionAction insert error", error);
+      console.log("[INSERT RESULT]", result);
+      if (result.error) {
+        console.error("toggleReactionAction insert error", {
+          message: result.error.message,
+          details: result.error.details,
+          hint: result.error.hint,
+          code: result.error.code,
+        });
+        redirect(`/t/${topicId}?error=${encodeURIComponent(`واکنش ثبت نشد: ${result.error.message}`)}`);
+      }
     } else if (existingReaction.value === value) {
-      const { error } = await supabase.from("reactions").delete().eq("id", existingReaction.id);
-      if (error) console.error("toggleReactionAction delete error", error);
+      const result = await supabase.from("reactions").delete().eq("id", existingReaction.id);
+      console.log("[DELETE RESULT]", result);
+      if (result.error) {
+        console.error("toggleReactionAction delete error", {
+          message: result.error.message,
+          details: result.error.details,
+          hint: result.error.hint,
+          code: result.error.code,
+        });
+        redirect(`/t/${topicId}?error=${encodeURIComponent(`حذف واکنش انجام نشد: ${result.error.message}`)}`);
+      }
     } else {
-      const { error } = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
-      if (error) console.error("toggleReactionAction update error", error);
+      const result = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
+      console.log("[UPDATE RESULT]", result);
+      if (result.error) {
+        console.error("toggleReactionAction update error", {
+          message: result.error.message,
+          details: result.error.details,
+          hint: result.error.hint,
+          code: result.error.code,
+        });
+        redirect(`/t/${topicId}?error=${encodeURIComponent(`به‌روزرسانی واکنش انجام نشد: ${result.error.message}`)}`);
+      }
     }
 
     await syncReactionCounts(targetType, targetId);
@@ -307,6 +340,8 @@ export async function toggleReactionAction(formData: FormData) {
 
 export async function toggleTopicReactionAction(input: { topicId: string; value: 1 | -1 }) {
   try {
+    console.log("[TOGGLE TOPIC REACTION]", input);
+
     const supabase = await createClient();
     const userResult = await supabase.auth.getUser();
     const user = userResult.data.user;
@@ -325,19 +360,34 @@ export async function toggleTopicReactionAction(input: { topicId: string; value:
       .maybeSingle();
 
     if (!existingReaction) {
-      const { error } = await supabase.from("reactions").insert({
+      const result = await supabase.from("reactions").insert({
         user_id: user.id,
         target_type: "topic",
         target_id: topicId,
         value,
       });
-      if (error) throw new Error(error.message);
+      console.log("[TOPIC INSERT RESULT]", result);
+      if (result.error) {
+        throw new Error(
+          `insert failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
+        );
+      }
     } else if (existingReaction.value === value) {
-      const { error } = await supabase.from("reactions").delete().eq("id", existingReaction.id);
-      if (error) throw new Error(error.message);
+      const result = await supabase.from("reactions").delete().eq("id", existingReaction.id);
+      console.log("[TOPIC DELETE RESULT]", result);
+      if (result.error) {
+        throw new Error(
+          `delete failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
+        );
+      }
     } else {
-      const { error } = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
-      if (error) throw new Error(error.message);
+      const result = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
+      console.log("[TOPIC UPDATE RESULT]", result);
+      if (result.error) {
+        throw new Error(
+          `update failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
+        );
+      }
     }
 
     await syncReactionCounts("topic", topicId);
