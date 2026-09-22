@@ -68,7 +68,8 @@ export async function signupAction(formData: FormData) {
     .maybeSingle();
 
   if (checkError) {
-    redirect(getSignupRedirect(email, "خطا در بررسی یوزرنیم. دوباره تلاش کن"));
+    console.error("SIGNUP username check error:", checkError);
+    redirect(getSignupRedirect(email, `خطا در بررسی یوزرنیم: ${checkError.message}`));
   }
 
   if (existingUsername) {
@@ -85,7 +86,8 @@ export async function signupAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(getSignupRedirect(email, "ثبت‌نام انجام نشد. لطفاً دوباره تلاش کن"));
+    console.error("SIGNUP error:", error);
+    redirect(getSignupRedirect(email, `ثبت‌نام انجام نشد: ${error.message}`));
   }
 
   redirect(`/verify-email?email=${encodeURIComponent(email)}`);
@@ -121,6 +123,7 @@ export async function loginAction(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
+    console.error("LOGIN error:", error);
     redirect(`/login?error=${encodeURIComponent(getLoginErrorMessage(error.message))}`);
   }
 
@@ -145,7 +148,8 @@ export async function resendVerificationAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/verify-email?email=${encodeURIComponent(email)}&error=${encodeURIComponent("ارسال مجدد انجام نشد")}`);
+    console.error("RESEND_VERIFICATION error:", error);
+    redirect(`/verify-email?email=${encodeURIComponent(email)}&error=${encodeURIComponent(`ارسال مجدد انجام نشد: ${error.message}`)}`);
   }
 
   redirect(`/verify-email?email=${encodeURIComponent(email)}&resent=1`);
@@ -168,53 +172,75 @@ export async function forgotPasswordAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/forgot-password?error=${encodeURIComponent("ارسال ایمیل بازیابی انجام نشد")}`);
+    console.error("FORGOT_PASSWORD error:", error);
+    redirect(`/forgot-password?error=${encodeURIComponent(`ارسال ایمیل بازیابی انجام نشد: ${error.message}`)}`);
   }
 
   redirect(`/forgot-password?success=1&email=${encodeURIComponent(email)}`);
 }
 
 export async function updateProfileAction(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const userResult = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
+    console.log("UPDATE_PROFILE auth.getUser:", {
+      userId: userResult.data.user?.id ?? null,
+      email: userResult.data.user?.email ?? null,
+      authError: userResult.error?.message ?? null,
+    });
+
+    const user = userResult.data.user;
+
+    if (!user) {
+      redirect(`/settings/profile?error=${encodeURIComponent("نشست ورود شما معتبر نیست. دوباره وارد شوید")}`);
+    }
+
+    const parsed = profileSchema.safeParse({
+      displayName: formData.get("display_name")?.toString().trim() ?? "",
+      bio: formData.get("bio")?.toString().trim() ?? "",
+      city: formData.get("city")?.toString().trim() ?? "",
+      job: formData.get("job")?.toString().trim() ?? "",
+      avatarUrl: formData.get("avatar_url")?.toString().trim() ?? "",
+    });
+
+    if (!parsed.success) {
+      redirect(`/settings/profile?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "ورودی نامعتبر است")}`);
+    }
+
+    const { displayName, bio, city, job, avatarUrl } = parsed.data;
+
+    const { data: updated, error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        display_name: displayName || null,
+        bio: bio || null,
+        city: city || null,
+        job: job || null,
+        avatar_url: avatarUrl || null,
+      })
+      .eq("id", user.id)
+      .select("id")
+      .maybeSingle();
+
+    if (updateError) {
+      console.error("UPDATE_PROFILE update error:", updateError);
+      redirect(`/settings/profile?error=${encodeURIComponent(`ذخیره پروفایل انجام نشد: ${updateError.message}`)}`);
+    }
+
+    if (!updated) {
+      console.error("UPDATE_PROFILE missing profile row", { userId: user.id });
+      redirect(
+        `/settings/profile?error=${encodeURIComponent("پروفایل شما پیدا نشد. ابتدا SQL تریگر profiles را در Supabase اجرا کنید")}`,
+      );
+    }
+
+    redirect("/settings/profile?success=1");
+  } catch (error) {
+    console.error("UPDATE_PROFILE unexpected error:", error);
+    const message = error instanceof Error ? error.message : "unknown error";
+    redirect(`/settings/profile?error=${encodeURIComponent(`خطای غیرمنتظره: ${message}`)}`);
   }
-
-  const parsed = profileSchema.safeParse({
-    displayName: formData.get("display_name")?.toString().trim() ?? "",
-    bio: formData.get("bio")?.toString().trim() ?? "",
-    city: formData.get("city")?.toString().trim() ?? "",
-    job: formData.get("job")?.toString().trim() ?? "",
-    avatarUrl: formData.get("avatar_url")?.toString().trim() ?? "",
-  });
-
-  if (!parsed.success) {
-    redirect(`/settings/profile?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "ورودی نامعتبر است")}`);
-  }
-
-  const { displayName, bio, city, job, avatarUrl } = parsed.data;
-
-  const { error } = await supabase.from("profiles").upsert(
-    {
-      id: user.id,
-      display_name: displayName || null,
-      bio: bio || null,
-      city: city || null,
-      job: job || null,
-      avatar_url: avatarUrl || null,
-    },
-    { onConflict: "id" },
-  );
-
-  if (error) {
-    redirect(`/settings/profile?error=${encodeURIComponent("ذخیره پروفایل انجام نشد")}`);
-  }
-
-  redirect("/settings/profile?success=1");
 }
 
 export async function logoutAction() {
