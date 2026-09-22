@@ -340,15 +340,23 @@ export async function toggleReactionAction(formData: FormData) {
 
 export async function toggleTopicReactionAction(input: { topicId: string; value: 1 | -1 }) {
   try {
-    console.log("[TOGGLE TOPIC REACTION]", input);
-
     const supabase = await createClient();
     const userResult = await supabase.auth.getUser();
     const user = userResult.data.user;
-    if (!user) throw new Error("کاربر وارد نشده است");
 
     const topicId = z.string().uuid().parse(input.topicId);
     const value = z.union([z.literal(1), z.literal(-1)]).parse(input.value);
+
+    console.log("[TOGGLE ENTER]", {
+      target_type: "topic",
+      target_id: topicId,
+      value,
+    });
+    console.log("[USER]", user?.id);
+
+    if (!user) {
+      throw new Error("کاربر وارد نشده است");
+    }
 
     const { data: existingReaction } = await supabase
       .from("reactions")
@@ -366,7 +374,7 @@ export async function toggleTopicReactionAction(input: { topicId: string; value:
         target_id: topicId,
         value,
       });
-      console.log("[TOPIC INSERT RESULT]", result);
+      console.log("[RESULT]", { data: result.data, error: result.error });
       if (result.error) {
         throw new Error(
           `insert failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
@@ -374,7 +382,7 @@ export async function toggleTopicReactionAction(input: { topicId: string; value:
       }
     } else if (existingReaction.value === value) {
       const result = await supabase.from("reactions").delete().eq("id", existingReaction.id);
-      console.log("[TOPIC DELETE RESULT]", result);
+      console.log("[RESULT]", { data: result.data, error: result.error });
       if (result.error) {
         throw new Error(
           `delete failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
@@ -382,7 +390,7 @@ export async function toggleTopicReactionAction(input: { topicId: string; value:
       }
     } else {
       const result = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
-      console.log("[TOPIC UPDATE RESULT]", result);
+      console.log("[RESULT]", { data: result.data, error: result.error });
       if (result.error) {
         throw new Error(
           `update failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
