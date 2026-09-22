@@ -3,6 +3,14 @@ import { cn } from "@/lib/utils";
 import type { CategoryNavItem } from "@/lib/forum-data";
 
 export function CategoryNav({ items, activeSlug }: { items: CategoryNavItem[]; activeSlug?: string }) {
+  if (items.length === 0) {
+    return (
+      <section className="mt-4 rounded-xl border border-dashed border-white/15 bg-zinc-900/40 p-3 text-sm text-zinc-400">
+        هنوز دسته‌ای برای نمایش پیدا نشد.
+      </section>
+    );
+  }
+
   return (
     <section className="mt-4 overflow-x-auto pb-2">
       <div className="flex min-w-max items-center gap-2">

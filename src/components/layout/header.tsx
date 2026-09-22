@@ -82,7 +82,10 @@ export async function Header() {
             </summary>
 
             <div className="absolute end-0 mt-2 w-52 rounded-xl border border-white/10 bg-zinc-900 p-2 shadow-2xl">
-              <Link href="/settings/profile" className="block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/10">
+              <Link
+                href={profile?.username ? `/u/${profile.username}` : "/settings/profile"}
+                className="block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/10"
+              >
                 پروفایل من
               </Link>
               <Link href="/settings/profile" className="block rounded-lg px-3 py-2 text-sm text-zinc-200 hover:bg-white/10">
