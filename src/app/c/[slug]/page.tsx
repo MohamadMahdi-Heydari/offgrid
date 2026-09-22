@@ -3,22 +3,18 @@ import { notFound } from "next/navigation";
 import { CategoryNav } from "@/components/topic/category-nav";
 import { TopicFeed } from "@/components/topic/topic-feed";
 import { formatRelative } from "@/lib/jalali";
-import { getCategoryBySlug, getOrderedCategories, getTopicsByCategory } from "@/lib/forum-data";
+import { getCategoryBySlug, getTopicsByCategory } from "@/lib/forum-data";
 
 type CategoryPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
 
-  const [category, categories, topics] = await Promise.all([
-    getCategoryBySlug(slug),
-    getOrderedCategories(),
-    getTopicsByCategory(slug),
-  ]);
+  const [category, topics] = await Promise.all([getCategoryBySlug(slug), getTopicsByCategory(slug, 20)]);
 
   if (!category) {
     notFound();
@@ -51,7 +47,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         </div>
       </section>
 
-      <CategoryNav items={categories} activeSlug={slug} />
+      <CategoryNav activeSlug={slug} />
       <TopicFeed topics={mappedTopics} />
     </main>
   );

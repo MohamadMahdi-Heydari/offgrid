@@ -1,9 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { CategoryNavItem } from "@/lib/forum-data";
+import { useCategories } from "@/components/layout/categories-provider";
 
-export function CategoryNav({ items, activeSlug }: { items: CategoryNavItem[]; activeSlug?: string }) {
-  if (items.length === 0) {
+export function CategoryNav({ items, activeSlug }: { items?: CategoryNavItem[]; activeSlug?: string }) {
+  const contextItems = useCategories();
+  const categories = items ?? contextItems;
+
+  if (categories.length === 0) {
     return (
       <section className="mt-4 rounded-xl border border-dashed border-white/15 bg-zinc-900/40 p-3 text-sm text-zinc-400">
         هنوز دسته‌ای برای نمایش پیدا نشد.
@@ -14,7 +20,7 @@ export function CategoryNav({ items, activeSlug }: { items: CategoryNavItem[]; a
   return (
     <section className="mt-4 overflow-x-auto pb-2">
       <div className="flex min-w-max items-center gap-2">
-        {items.map((category) => {
+        {categories.map((category) => {
           const isActive = category.slug === activeSlug;
 
           return (

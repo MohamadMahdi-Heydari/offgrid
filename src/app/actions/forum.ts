@@ -138,8 +138,12 @@ export async function createTopicAction(formData: FormData) {
       }
     }
 
+    const { data: categoryRow } = await supabase.from("categories").select("slug").eq("id", payload.categoryId).maybeSingle();
+
     revalidatePath("/");
-    revalidatePath(`/c/${payload.categoryId}`);
+    if (categoryRow?.slug) {
+      revalidatePath(`/c/${categoryRow.slug}`);
+    }
     redirect(`/t/${createdTopic.id}`);
   } catch (error) {
     unstable_rethrow(error);

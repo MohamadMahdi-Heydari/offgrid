@@ -1,0 +1,10 @@
+create index if not exists idx_topics_category on topics(category_id, last_activity desc) where is_deleted = false;
+create index if not exists idx_topics_activity on topics(last_activity desc) where is_deleted = false;
+create index if not exists idx_topics_author on topics(author_id);
+create index if not exists idx_replies_topic on replies(topic_id, created_at asc) where is_deleted = false;
+create index if not exists idx_replies_author on replies(author_id);
+create index if not exists idx_replies_parent on replies(parent_id) where parent_id is not null;
+create index if not exists idx_reactions_target on reactions(target_type, target_id);
+create index if not exists idx_reactions_user on reactions(user_id);
+create index if not exists idx_follows_follower on follows(follower_id);
+create index if not exists idx_follows_following on follows(following_id);

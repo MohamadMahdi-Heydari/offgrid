@@ -2,22 +2,19 @@ import Link from "next/link";
 import { CategoryNav } from "@/components/topic/category-nav";
 import { TopicFeed } from "@/components/topic/topic-feed";
 import { formatRelative } from "@/lib/jalali";
-import { getOrderedCategories, getTopicsFeed } from "@/lib/forum-data";
+import { getTopicsFeed } from "@/lib/forum-data";
 
 type HomePageProps = {
   searchParams: Promise<{ tab?: string }>;
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = await searchParams;
   const selectedTab = params.tab === "new" || params.tab === "following" ? params.tab : "hot";
 
-  const [categoryItems, topics] = await Promise.all([
-    getOrderedCategories(),
-    selectedTab === "following" ? Promise.resolve([]) : getTopicsFeed(selectedTab === "new" ? "new" : "hot"),
-  ]);
+  const topics = selectedTab === "following" ? [] : await getTopicsFeed(selectedTab === "new" ? "new" : "hot", 20);
 
   const mappedTopics = topics.map((topic) => ({
     ...topic,
@@ -64,7 +61,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <CategoryNav items={categoryItems} />
+      <CategoryNav />
 
       {selectedTab === "following" ? (
         <section className="mt-4 rounded-2xl border border-dashed border-white/15 bg-[color:var(--surface)]/50 p-10 text-center">

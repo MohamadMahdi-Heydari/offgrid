@@ -11,33 +11,32 @@ type UserProfilePageProps = {
   params: Promise<{ username: string }>;
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 120;
 
 export default async function UserProfilePage({ params }: UserProfilePageProps) {
   const { username } = await params;
 
-  const profile = await getPublicProfileByUsername(username);
+  const supabase = await createClient();
+  const [profile, userResult] = await Promise.all([getPublicProfileByUsername(username), supabase.auth.getUser()]);
+
   if (!profile) notFound();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = userResult.data.user;
 
-  const topics = await getTopicsByAuthor(profile.id);
+  const [topics, followResult] = await Promise.all([
+    getTopicsByAuthor(profile.id, 20),
+    user && user.id !== profile.id
+      ? supabase
+          .from("follows")
+          .select("follower_id")
+          .eq("follower_id", user.id)
+          .eq("following_id", profile.id)
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
-  let isFollowing = false;
-
-  if (user && user.id !== profile.id) {
-    const { data } = await supabase
-      .from("follows")
-      .select("follower_id")
-      .eq("follower_id", user.id)
-      .eq("following_id", profile.id)
-      .limit(1)
-      .maybeSingle();
-    isFollowing = Boolean(data);
-  }
+  const isFollowing = Boolean(followResult.data);
 
   const mappedTopics = topics.map((topic) => ({ ...topic, createdAtLabel: formatRelative(topic.createdAt) }));
 

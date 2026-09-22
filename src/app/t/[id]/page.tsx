@@ -12,23 +12,20 @@ type TopicPageProps = {
   searchParams: Promise<{ error?: string }>;
 };
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 export default async function TopicPage({ params, searchParams }: TopicPageProps) {
   const { id } = await params;
   const query = await searchParams;
 
-  const [topic, replies] = await Promise.all([getTopicById(id), getRepliesByTopic(id)]);
+  const supabase = await createClient();
+  const [topic, replies, userResult] = await Promise.all([getTopicById(id), getRepliesByTopic(id), supabase.auth.getUser()]);
 
   if (!topic) {
     notFound();
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = userResult.data.user;
   const canSelectBest = Boolean(user && topic.authorId === user.id && topic.type === "question");
 
   return (

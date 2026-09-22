@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 
 export type CategoryNavItem = {
@@ -97,8 +98,8 @@ function createSupabasePublicClient() {
   });
 }
 
-export async function getOrderedCategories() {
-  try {
+const getOrderedCategoriesCached = unstable_cache(
+  async () => {
     const supabase = createSupabasePublicClient();
     const { data, error } = await supabase.from("categories").select("id,name,slug,icon,description,order").order("order", { ascending: true });
 
@@ -107,9 +108,15 @@ export async function getOrderedCategories() {
       return [] as CategoryNavItem[];
     }
 
-    const rows = (data ?? []).filter((item) => Number(item.order ?? 0) > 0) as CategoryNavItem[];
-    console.log("CATEGORIES DEBUG:", { count: rows.length, first: rows[0] ?? null });
-    return rows;
+    return (data ?? []).filter((item) => Number(item.order ?? 0) > 0) as CategoryNavItem[];
+  },
+  ["ordered-categories"],
+  { revalidate: 300, tags: ["categories"] },
+);
+
+export async function getOrderedCategories() {
+  try {
+    return await getOrderedCategoriesCached();
   } catch (error) {
     console.error("getOrderedCategories unexpected", error);
     return [] as CategoryNavItem[];
@@ -213,7 +220,7 @@ export async function getTopicsFeed(sort: "hot" | "new", limit = 20) {
       .from("topics")
       .select("id,title,body,type,category_id,author_id,is_pinned,is_solved,like_count,dislike_count,reply_count,created_at")
       .eq("is_deleted", false)
-      .limit(limit * 3)
+      .limit(limit)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -224,15 +231,13 @@ export async function getTopicsFeed(sort: "hot" | "new", limit = 20) {
     const mapped = await mapTopics((data ?? []) as RawTopic[]);
 
     if (sort === "new") {
-      return mapped.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
+      return mapped.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }
 
-    return mapped
-      .sort((a, b) => {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-        return hotScore(b) - hotScore(a);
-      })
-      .slice(0, limit);
+    return mapped.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return hotScore(b) - hotScore(a);
+    });
   } catch (error) {
     console.error("getTopicsFeed unexpected", error);
     return [] as FeedTopic[];
@@ -322,7 +327,8 @@ export async function getRepliesByTopic(topicId: string) {
       .select("id,topic_id,parent_id,body,path,depth,like_count,dislike_count,reply_count,created_at,author_id")
       .eq("topic_id", topicId)
       .eq("is_deleted", false)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .limit(500);
 
     if (error) {
       console.error("getRepliesByTopic error", error);
