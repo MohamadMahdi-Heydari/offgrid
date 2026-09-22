@@ -13,21 +13,25 @@ type ReplyTreeProps = {
 
 function ReplyNode({
   reply,
-  replies,
+  allReplies,
   topicId,
   canSelectBest,
+  depth,
   isBest,
 }: {
   reply: ReplyItem;
-  replies: ReplyItem[];
+  allReplies: ReplyItem[];
   topicId: string;
   canSelectBest: boolean;
+  depth: number;
   isBest: boolean;
 }) {
-  const children = replies.filter((item) => item.parentId === reply.id).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const children = allReplies
+    .filter((item) => item.parentId === reply.id)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   return (
-    <li className="relative mt-4 border-s border-white/10 ps-4">
+    <li className="mt-4" style={{ marginInlineStart: `${depth * 24}px` }}>
       <article className={`rounded-xl border ${isBest ? "border-emerald-400/40" : "border-white/10"} bg-zinc-900/60 p-4`}>
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
           <span>
@@ -95,7 +99,15 @@ function ReplyNode({
       {children.length > 0 ? (
         <ul>
           {children.map((child) => (
-            <ReplyNode key={child.id} reply={child} replies={replies} topicId={topicId} canSelectBest={canSelectBest} isBest={false} />
+            <ReplyNode
+              key={child.id}
+              reply={child}
+              allReplies={allReplies}
+              topicId={topicId}
+              canSelectBest={canSelectBest}
+              depth={depth + 1}
+              isBest={false}
+            />
           ))}
         </ul>
       ) : null}
@@ -106,9 +118,11 @@ function ReplyNode({
 export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest }: ReplyTreeProps) {
   const topLevel = replies.filter((reply) => !reply.parentId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-  const bestReply = bestReplyId ? replies.find((reply) => reply.id === bestReplyId) ?? null : null;
-
-  const sortedTopLevel = bestReply ? [bestReply, ...topLevel.filter((reply) => reply.id !== bestReply.id)] : topLevel;
+  const sortedTopLevel = topLevel.sort((a, b) => {
+    if (bestReplyId && a.id === bestReplyId) return -1;
+    if (bestReplyId && b.id === bestReplyId) return 1;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
 
   return (
     <section className="mt-6">
@@ -124,10 +138,11 @@ export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest }: Repl
             <ReplyNode
               key={reply.id}
               reply={reply}
-              replies={replies.filter((item) => item.id !== (bestReply?.id ?? ""))}
+              allReplies={replies}
               topicId={topicId}
               canSelectBest={canSelectBest}
-              isBest={bestReply?.id === reply.id}
+              depth={0}
+              isBest={bestReplyId === reply.id}
             />
           ))}
         </ul>

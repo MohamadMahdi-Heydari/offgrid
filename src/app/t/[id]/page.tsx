@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getRepliesByTopic, getRoleEmoji, getTopicById } from "@/lib/forum-data";
 import { renderMarkdown } from "@/lib/markdown";
 import { formatRelative } from "@/lib/jalali";
-import { createReplyAction, toggleReactionAction } from "@/app/actions/forum";
+import { createReplyAction } from "@/app/actions/forum";
 import { ReplyTree } from "@/components/reply/reply-tree";
+import { TopicReactionBar } from "@/components/topic/topic-reaction-bar";
 
 type TopicPageProps = {
   params: Promise<{ id: string }>;
@@ -27,6 +28,17 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
 
   const user = userResult.data.user;
   const canSelectBest = Boolean(user && topic.authorId === user.id && topic.type === "question");
+
+  const { data: currentReaction } = user
+    ? await supabase
+        .from("reactions")
+        .select("value")
+        .eq("user_id", user.id)
+        .eq("target_type", "topic")
+        .eq("target_id", topic.id)
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
@@ -53,29 +65,14 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
 
         <div className="mt-4 text-[15px] leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(topic.body) }} />
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <form action={toggleReactionAction}>
-            <input type="hidden" name="topic_id" value={topic.id} />
-            <input type="hidden" name="target_type" value="topic" />
-            <input type="hidden" name="target_id" value={topic.id} />
-            <input type="hidden" name="value" value="1" />
-            <button type="submit" className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-200 hover:bg-white/10">
-              👍 {topic.likeCount}
-            </button>
-          </form>
+        <TopicReactionBar
+          topicId={topic.id}
+          initialLikeCount={topic.likeCount}
+          initialDislikeCount={topic.dislikeCount}
+          initialReaction={currentReaction?.value === 1 ? 1 : currentReaction?.value === -1 ? -1 : 0}
+        />
 
-          <form action={toggleReactionAction}>
-            <input type="hidden" name="topic_id" value={topic.id} />
-            <input type="hidden" name="target_type" value="topic" />
-            <input type="hidden" name="target_id" value={topic.id} />
-            <input type="hidden" name="value" value="-1" />
-            <button type="submit" className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-200 hover:bg-white/10">
-              👎 {topic.dislikeCount}
-            </button>
-          </form>
-
-          <span className="text-xs text-zinc-400">{topic.replyCount} پاسخ</span>
-        </div>
+        <div className="mt-2 text-xs text-zinc-400">{topic.replyCount} پاسخ</div>
       </article>
 
       <section className="mt-6 rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/70 p-4">

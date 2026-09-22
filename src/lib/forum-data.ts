@@ -149,7 +149,9 @@ async function mapTopics(rawTopics: RawTopic[]) {
   const categoryIds = [...new Set(rawTopics.map((t) => t.category_id).filter(Boolean))] as string[];
   const authorIds = [...new Set(rawTopics.map((t) => t.author_id).filter(Boolean))] as string[];
 
-  const [{ data: categoryRows }, { data: profileRows }, { data: topicTagRows }] = await Promise.all([
+  const topicIds = rawTopics.map((topic) => topic.id);
+
+  const [{ data: categoryRows }, { data: profileRows }, { data: topicTagRows }, { data: reactionRows }] = await Promise.all([
     categoryIds.length
       ? supabase.from("categories").select("id,name,slug").in("id", categoryIds)
       : Promise.resolve({ data: [] as { id: string; name: string; slug: string }[] }),
@@ -162,9 +164,12 @@ async function mapTopics(rawTopics: RawTopic[]) {
           .select("topic_id,tag_id")
           .in(
             "topic_id",
-            rawTopics.map((topic) => topic.id),
+            topicIds,
           )
       : Promise.resolve({ data: [] as { topic_id: string; tag_id: string }[] }),
+    rawTopics.length
+      ? supabase.from("reactions").select("target_id,value").eq("target_type", "topic").in("target_id", topicIds)
+      : Promise.resolve({ data: [] as { target_id: string; value: 1 | -1 }[] }),
   ]);
 
   const tagIds = [...new Set((topicTagRows ?? []).map((row) => row.tag_id))];
@@ -176,6 +181,14 @@ async function mapTopics(rawTopics: RawTopic[]) {
   const categoryMap = new Map((categoryRows ?? []).map((item) => [item.id, item]));
   const profileMap = new Map((profileRows ?? []).map((item) => [item.id, item]));
   const tagMap = new Map<string, string[]>();
+  const reactionCountMap = new Map<string, { like: number; dislike: number }>();
+
+  (reactionRows ?? []).forEach((row) => {
+    const current = reactionCountMap.get(row.target_id) ?? { like: 0, dislike: 0 };
+    if (row.value === 1) current.like += 1;
+    if (row.value === -1) current.dislike += 1;
+    reactionCountMap.set(row.target_id, current);
+  });
 
   (topicTagRows ?? []).forEach((row) => {
     const current = tagMap.get(row.topic_id) ?? [];
@@ -188,14 +201,16 @@ async function mapTopics(rawTopics: RawTopic[]) {
     const category = row.category_id ? categoryMap.get(row.category_id) : null;
     const author = row.author_id ? profileMap.get(row.author_id) : null;
 
+    const reactionCounts = reactionCountMap.get(row.id) ?? { like: row.like_count ?? 0, dislike: row.dislike_count ?? 0 };
+
     return {
       id: row.id,
       title: row.title,
       excerpt: row.body.slice(0, 190),
       author: author?.username ?? "guest",
       roleEmoji: roleToEmoji(author?.role ?? null),
-      likeCount: row.like_count ?? 0,
-      dislikeCount: row.dislike_count ?? 0,
+      likeCount: reactionCounts.like,
+      dislikeCount: reactionCounts.dislike,
       replyCount: row.reply_count ?? 0,
       createdAt: new Date(row.created_at),
       category: category?.name ?? "بدون دسته",
@@ -286,14 +301,18 @@ export async function getTopicById(id: string) {
 
     if (error || !topic) return null;
 
-    const [categoryResult, authorResult] = await Promise.all([
+    const [categoryResult, authorResult, reactionResult] = await Promise.all([
       topic.category_id
         ? supabase.from("categories").select("name,slug").eq("id", topic.category_id).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
       topic.author_id
         ? supabase.from("profiles").select("username,role").eq("id", topic.author_id).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
+      supabase.from("reactions").select("value").eq("target_type", "topic").eq("target_id", topic.id),
     ]);
+
+    const topicLikeCount = (reactionResult.data ?? []).filter((row) => row.value === 1).length;
+    const topicDislikeCount = (reactionResult.data ?? []).filter((row) => row.value === -1).length;
 
     return {
       id: topic.id,
@@ -303,8 +322,8 @@ export async function getTopicById(id: string) {
       questionContext: topic.question_context,
       bestReplyId: topic.best_reply_id,
       isSolved: topic.is_solved,
-      likeCount: topic.like_count ?? 0,
-      dislikeCount: topic.dislike_count ?? 0,
+      likeCount: topicLikeCount,
+      dislikeCount: topicDislikeCount,
       replyCount: topic.reply_count ?? 0,
       createdAt: new Date(topic.created_at),
       authorId: topic.author_id,

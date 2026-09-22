@@ -224,21 +224,10 @@ export async function createReplyAction(formData: FormData) {
       redirect(`/t/${topicId}?error=${encodeURIComponent(`ارسال پاسخ انجام نشد: ${insertError.message}`)}`);
     }
 
-    const { data: topicCounters } = await supabase.from("topics").select("reply_count").eq("id", topicId).single();
-    await supabase
-      .from("topics")
-      .update({ reply_count: (topicCounters?.reply_count ?? 0) + 1, last_activity: new Date().toISOString() })
-      .eq("id", topicId);
-
-    if (normalizedParentId) {
-      const { data: parentCounter } = await supabase.from("replies").select("reply_count").eq("id", normalizedParentId).single();
-      await supabase
-        .from("replies")
-        .update({ reply_count: (parentCounter?.reply_count ?? 0) + 1 })
-        .eq("id", normalizedParentId);
-    }
+    await supabase.from("topics").update({ last_activity: new Date().toISOString() }).eq("id", topicId);
 
     revalidatePath(`/t/${topicId}`);
+    revalidatePath("/");
     redirect(`/t/${topicId}`);
   } catch (error) {
     unstable_rethrow(error);
@@ -309,9 +298,63 @@ export async function toggleReactionAction(formData: FormData) {
 
     await syncReactionCounts(targetType, targetId);
     revalidatePath(`/t/${topicId}`);
+    revalidatePath("/");
   } catch (error) {
     unstable_rethrow(error);
     console.error("toggleReactionAction unexpected", error);
+  }
+}
+
+export async function toggleTopicReactionAction(input: { topicId: string; value: 1 | -1 }) {
+  try {
+    const supabase = await createClient();
+    const userResult = await supabase.auth.getUser();
+    const user = userResult.data.user;
+    if (!user) throw new Error("کاربر وارد نشده است");
+
+    const topicId = z.string().uuid().parse(input.topicId);
+    const value = z.union([z.literal(1), z.literal(-1)]).parse(input.value);
+
+    const { data: existingReaction } = await supabase
+      .from("reactions")
+      .select("id,value")
+      .eq("user_id", user.id)
+      .eq("target_type", "topic")
+      .eq("target_id", topicId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!existingReaction) {
+      const { error } = await supabase.from("reactions").insert({
+        user_id: user.id,
+        target_type: "topic",
+        target_id: topicId,
+        value,
+      });
+      if (error) throw new Error(error.message);
+    } else if (existingReaction.value === value) {
+      const { error } = await supabase.from("reactions").delete().eq("id", existingReaction.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
+      if (error) throw new Error(error.message);
+    }
+
+    await syncReactionCounts("topic", topicId);
+
+    const { data: topic } = await supabase.from("topics").select("like_count,dislike_count").eq("id", topicId).single();
+
+    revalidatePath(`/t/${topicId}`);
+    revalidatePath("/");
+
+    return {
+      likeCount: topic?.like_count ?? 0,
+      dislikeCount: topic?.dislike_count ?? 0,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("toggleTopicReactionAction unexpected", error);
+    throw error;
   }
 }
 
