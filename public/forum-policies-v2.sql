@@ -1,12 +1,16 @@
--- OffGrid forum policies (updated)
--- بدون وابستگی به auth.users در policy
+-- OffGrid forum policies v2
+-- هدف: حذف وابستگی policyها به auth.users
 
+-- RLS
 alter table public.topics enable row level security;
 alter table public.replies enable row level security;
 alter table public.reactions enable row level security;
 alter table public.topic_tags enable row level security;
+alter table public.follows enable row level security;
+alter table public.bookmarks enable row level security;
+alter table public.topic_follows enable row level security;
 
--- idempotent drops
+-- drop old policies (idempotent)
 drop policy if exists "public can read topics" on public.topics;
 drop policy if exists "verified users create topics" on public.topics;
 drop policy if exists "authenticated users create topics" on public.topics;
@@ -27,6 +31,10 @@ drop policy if exists "public read reactions" on public.reactions;
 drop policy if exists "authenticated add topic tags" on public.topic_tags;
 drop policy if exists "authenticated create topic_tags" on public.topic_tags;
 drop policy if exists "public read topic tags" on public.topic_tags;
+
+drop policy if exists "users manage own follows" on public.follows;
+drop policy if exists "users manage own bookmarks" on public.bookmarks;
+drop policy if exists "users manage own topic follows" on public.topic_follows;
 
 -- topics
 create policy "public can read topics"
@@ -124,3 +132,27 @@ with check (
     where t.id = topic_id and t.author_id = auth.uid()
   )
 );
+
+-- follows
+create policy "users manage own follows"
+on public.follows
+for all
+to authenticated
+using (auth.uid() = follower_id)
+with check (auth.uid() = follower_id);
+
+-- bookmarks
+create policy "users manage own bookmarks"
+on public.bookmarks
+for all
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- topic_follows
+create policy "users manage own topic follows"
+on public.topic_follows
+for all
+to authenticated
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);

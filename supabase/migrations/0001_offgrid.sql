@@ -308,39 +308,17 @@ alter table public.notifications enable row level security;
 create policy "public can read topics" on public.topics
 for select using (not is_deleted);
 
-create policy "verified users create topics" on public.topics
+create policy "authenticated users create topics" on public.topics
 for insert to authenticated
-with check (
-  auth.uid() = author_id
-  and exists (
-    select 1
-    from public.profiles p
-    join auth.users u on u.id = p.id
-    where p.id = auth.uid()
-      and u.email_confirmed_at is not null
-      and u.created_at < now() - interval '4 hours'
-  )
-);
+with check (auth.uid() = author_id);
 
-create policy "verified users reply" on public.replies
+create policy "authenticated users reply" on public.replies
 for insert to authenticated
-with check (
-  auth.uid() = author_id
-  and exists (
-    select 1 from auth.users u
-    where u.id = auth.uid() and u.email_confirmed_at is not null
-  )
-);
+with check (auth.uid() = author_id);
 
-create policy "verified users react" on public.reactions
+create policy "authenticated users react" on public.reactions
 for insert to authenticated
-with check (
-  auth.uid() = user_id
-  and exists (
-    select 1 from auth.users u
-    where u.id = auth.uid() and u.email_confirmed_at is not null
-  )
-);
+with check (auth.uid() = user_id);
 
 create policy "public read categories" on public.categories for select using (true);
 create policy "public read tags" on public.tags for select using (true);
