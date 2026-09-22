@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site-url";
 
@@ -237,6 +237,7 @@ export async function updateProfileAction(formData: FormData) {
 
     redirect("/settings/profile?success=1");
   } catch (error) {
+    unstable_rethrow(error);
     console.error("UPDATE_PROFILE unexpected error:", error);
     const message = error instanceof Error ? error.message : "unknown error";
     redirect(`/settings/profile?error=${encodeURIComponent(`خطای غیرمنتظره: ${message}`)}`);
