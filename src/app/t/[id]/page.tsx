@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getRepliesByTopic, getRoleEmoji, getTopicById } from "@/lib/forum-data";
+import { getRepliesByTopic, getTopicById } from "@/lib/forum-data";
+import { RoleBadge } from "@/components/user/role-badge";
 import { renderMarkdown } from "@/lib/markdown";
 import { formatRelative } from "@/lib/jalali";
 import { createReplyAction } from "@/app/actions/forum";
@@ -60,9 +61,8 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
             {topic.categoryName}
           </Link>
           <span>•</span>
-          <span>
-            {getRoleEmoji(topic.authorRole)} @{topic.authorUsername}
-          </span>
+          <RoleBadge role={topic.authorRole} size="sm" />
+          <span>@{topic.authorUsername}</span>
           <span>•</span>
           <span>{formatRelative(topic.createdAt)}</span>
         </div>

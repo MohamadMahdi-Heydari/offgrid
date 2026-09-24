@@ -4,11 +4,29 @@ import { notFound } from "next/navigation";
 import { toggleFollowUserAction } from "@/app/actions/forum";
 import { TopicFeed } from "@/components/topic/topic-feed";
 import { PersonalSky } from "@/components/profile/personal-sky";
-import { FirstFlame } from "@/components/brand/first-flame";
+import { GuardianShield } from "@/components/brand/guardian-shield";
+import { NetworkGear } from "@/components/brand/network-gear";
 import { CreatorEmber } from "@/components/brand/creator-ember";
+import { RoleBadge } from "@/components/user/role-badge";
 import { createClient } from "@/lib/supabase/server";
 import { formatJalali, formatRelative } from "@/lib/jalali";
-import { getPublicProfileByUsername, getRoleEmoji, getTopicsByAuthor } from "@/lib/forum-data";
+import { getPublicProfileByUsername, getTopicsByAuthor } from "@/lib/forum-data";
+
+/** آیکون کنار نام + گلو رنگیِ هر نقش هنگام هاور روی نام */
+const ROLE_ICONS = {
+  moderator: {
+    Icon: GuardianShield,
+    hoverGlow: "group-hover/name:drop-shadow-[0_0_12px_rgba(239,68,68,0.7)]",
+  },
+  admin: {
+    Icon: NetworkGear,
+    hoverGlow: "group-hover/name:drop-shadow-[0_0_12px_rgba(249,115,22,0.7)]",
+  },
+  legend: {
+    Icon: CreatorEmber,
+    hoverGlow: "group-hover/name:drop-shadow-[0_0_12px_rgba(59,130,246,0.7)]",
+  },
+} as const;
 
 type UserProfilePageProps = {
   params: Promise<{ username: string }>;
@@ -43,6 +61,8 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
   // پیام‌های حالت خالی فقط وقتی شخصی‌سازی می‌شوند که بیننده، خودِ صاحب پروفایل باشد
   const isOwner = Boolean(user && user.id === profile.id);
   const displayName = profile.displayName || profile.username;
+  const iconConfig =
+    profile.role && profile.role !== "user" ? ROLE_ICONS[profile.role as keyof typeof ROLE_ICONS] : undefined;
 
   const mappedTopics = topics.map((topic) => ({ ...topic, createdAtLabel: formatRelative(topic.createdAt) }));
 
@@ -59,18 +79,18 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               )}
             </div>
             <div>
-              {profile.role === "legend" ? (
-                <span className="mb-1.5 inline-flex items-center gap-1 rounded-full border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#3B82F6]">
-                  <FirstFlame className="h-3.5 w-3.5" />
-                  سازنده
-                </span>
-              ) : null}
+              <div className="mb-1.5">
+                <RoleBadge role={profile.role} size="md" />
+              </div>
               <h1 className="group/name text-2xl font-bold text-zinc-50">
                 {displayName}
-                {profile.role === "legend" ? (
-                  <CreatorEmber className="ms-2 inline-block h-6 w-6 align-middle transition-[transform,filter] duration-300 group-hover/name:scale-110 group-hover/name:drop-shadow-[0_0_8px_rgba(96,165,250,0.85)]" />
+                {iconConfig ? (
+                  <span
+                    className={`ms-2 inline-block h-6 w-6 align-middle transition-[transform,filter] duration-200 group-hover/name:scale-110 group-hover/name:hover:scale-125 ${iconConfig.hoverGlow}`}
+                  >
+                    <iconConfig.Icon className="h-6 w-6" />
+                  </span>
                 ) : null}
-                {getRoleEmoji(profile.role) ? ` ${getRoleEmoji(profile.role)}` : null}
               </h1>
               <p className="text-sm text-zinc-400">@{profile.username}</p>
               <p className="mt-1 text-sm text-zinc-300">{profile.bio || "بیویی ثبت نشده."}</p>

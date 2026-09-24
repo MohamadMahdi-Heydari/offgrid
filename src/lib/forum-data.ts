@@ -15,7 +15,7 @@ export type FeedTopic = {
   title: string;
   excerpt: string;
   author: string;
-  roleEmoji: string;
+  authorRole: string;
   likeCount: number;
   dislikeCount: number;
   replyCount: number;
@@ -75,14 +75,7 @@ export type PublicProfile = {
   createdAt: Date;
 };
 
-function roleToEmoji(role: string | null) {
-  // نشان افسانه دیگر ایموجی نیست؛ «شعله‌ی نخست» (FirstFlame) جایگزینش است
-  // تا کنار بج «سازنده» دو بار تکرار نشود.
-  if (role === "legend") return "";
-  if (role === "admin") return "⚙️";
-  if (role === "moderator") return "🛡️";
-  return "";
-}
+
 
 function createSupabasePublicClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -210,7 +203,7 @@ async function mapTopics(rawTopics: RawTopic[]) {
       title: row.title,
       excerpt: row.body.slice(0, 190),
       author: author?.username ?? "guest",
-      roleEmoji: roleToEmoji(author?.role ?? null),
+      authorRole: author?.role ?? "user",
       likeCount: reactionCounts.like,
       dislikeCount: reactionCounts.dislike,
       replyCount: row.reply_count ?? 0,
@@ -439,6 +432,4 @@ export async function getTopicsByAuthor(authorId: string, limit = 50) {
   }
 }
 
-export function getRoleEmoji(role: string | null) {
-  return roleToEmoji(role);
-}
+

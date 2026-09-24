@@ -3,9 +3,9 @@ import { createReplyAction, selectBestReplyAction } from "@/app/actions/forum";
 import { renderMarkdown } from "@/lib/markdown";
 import { formatRelative } from "@/lib/jalali";
 import type { ReplyItem } from "@/lib/forum-data";
-import { getRoleEmoji } from "@/lib/forum-data";
 import { LanternVote } from "@/components/reaction/lantern-vote";
 import { EmptyState } from "@/components/ui/empty-state";
+import { RoleBadge } from "@/components/user/role-badge";
 
 type ViewerReactions = Record<string, 1 | -1>;
 
@@ -42,9 +42,8 @@ function ReplyNode({
     <li className="mt-4" style={{ marginInlineStart: `${depth * 24}px` }}>
       <article className={`rounded-xl border ${isBest ? "border-emerald-400/40" : "border-white/10"} bg-zinc-900/60 p-4`}>
         <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-          <span>
-            {getRoleEmoji(reply.authorRole)} @{reply.authorUsername}
-          </span>
+          <RoleBadge role={reply.authorRole} size="sm" />
+          <span>@{reply.authorUsername}</span>
           <span>•</span>
           <span>{formatRelative(reply.createdAt)}</span>
         </div>

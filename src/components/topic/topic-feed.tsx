@@ -5,13 +5,14 @@ import { motion } from "framer-motion";
 import { CheckCheck, Flame, MessageCircle, Pin, Tag } from "lucide-react";
 import { OffgridLantern } from "@/components/brand/offgrid-lantern";
 import { EmptyState } from "@/components/ui/empty-state";
+import { RoleBadge } from "@/components/user/role-badge";
 
 type TopicItem = {
   id: string;
   title: string;
   excerpt: string;
   author: string;
-  roleEmoji: string;
+  authorRole: string;
   likeCount: number;
   replyCount: number;
   createdAtLabel: string;
@@ -83,9 +84,8 @@ export function TopicFeed({ topics, emptyState }: { topics: TopicItem[]; emptySt
                   {topic.category}
                 </Link>
                 <span>•</span>
-                <span>
-                  {topic.roleEmoji ? `${topic.roleEmoji} ` : ""}@{topic.author}
-                </span>
+                <RoleBadge role={topic.authorRole} size="sm" />
+                <span>@{topic.author}</span>
                 <span>•</span>
                 <span>{topic.createdAtLabel}</span>
               </div>
