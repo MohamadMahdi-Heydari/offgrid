@@ -163,9 +163,27 @@ select {
   animation: lantern-icon-glow 2.4s ease-in-out 0.8s infinite;
 }
 
+/* ===== آسمان شخصی ===== */
+
+/* چشمک‌زدن ملایم ستاره‌ها — opacity بین ۰٫۷ تا ۱ */
+@keyframes star-twinkle {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.star-twinkle {
+  animation: star-twinkle var(--tw-dur, 3s) ease-in-out var(--tw-delay, 0s) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lantern-hero-glow,
-  .lantern-lit .lantern-flame {
+  .lantern-lit .lantern-flame,
+  .star-twinkle {
     animation: none;
   }
   .lantern-burst,

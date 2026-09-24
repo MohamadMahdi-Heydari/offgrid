@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { motion } from "framer-motion";
 import { Flame, Sparkles, TrendingUp } from "lucide-react";
 
@@ -15,15 +15,7 @@ export type SkyTopic = {
   categoryName: string;
 };
 
-type StarPlacement = SkyTopic & {
-  x: number;
-  y: number;
-  size: number;
-  opacity: number;
-  bright: boolean;
-};
-
-/** هش deterministic ساده برای جای‌گذاری پایدار ستاره‌ها */
+/** هش deterministic — همان الگوریتم قبلی، پس جای ستاره‌ی تاپیک‌های فعلی تغییر نمی‌کند */
 function hashString(input: string): number {
   let hash = 5381;
   for (let index = 0; index < input.length; index += 1) {
@@ -38,45 +30,102 @@ function seededUnit(topicId: string, salt: number): number {
   return x - Math.floor(x);
 }
 
-/** درخشندگی نمایی — مقیاس لایک سریع اشباع نمی‌شود */
-function glowLevel(likeCount: number) {
-  const score = Math.log2(Math.max(0, likeCount) + 1);
-  const opacity = Math.min(0.5 + score * 0.16, 1);
-  const size = 2 + Math.min(score, 5) * 0.9;
-  return { opacity, size: Math.round(size * 10) / 10, bright: likeCount > 5, medium: likeCount >= 1 && likeCount <= 5 };
+type Star = SkyTopic & {
+  /** موقعیت کسری: همیشه توی بازه‌ی [۰٫۱، ۰٫۹] تا حداقل ۱۰٪ از لبه‌ها فاصله داشته باشد */
+  fx: number;
+  fy: number;
+};
+
+const EDGE = 0.1;
+
+function buildStars(topics: SkyTopic[]): Star[] {
+  return topics.map((topic) => ({
+    ...topic,
+    fx: EDGE + seededUnit(topic.id, 7) * (1 - EDGE * 2),
+    fy: EDGE + seededUnit(topic.id, 29) * (1 - EDGE * 2),
+  }));
 }
 
-function nebulaColor(likeCount: number) {
-  if (likeCount > 5) return "#A855F7";
-  if (likeCount >= 1) return "#C084FC";
-  return "#9D8AC8";
+/** غبار ستاره‌ای محوِ پس‌زمینه — ثابت و deterministic برای SSR */
+const DUST = Array.from({ length: 26 }, (_, index) => ({
+  fx: 0.03 + seededUnit("offgrid-sky-dust", index * 7 + 1) * 0.94,
+  fy: 0.03 + seededUnit("offgrid-sky-dust", index * 7 + 40) * 0.94,
+  r: 0.5 + seededUnit("offgrid-sky-dust", index * 7 + 80) * 0.9,
+  opacity: 0.15 + seededUnit("offgrid-sky-dust", index * 7 + 120) * 0.3,
+}));
+
+/** ابعاد ستاره در پیکسل واقعی — کوچک و تیز؛ محبوبیت فقط درخشندگی را شدت می‌دهد */
+const CORE_R = 3;
+const SPARKLE_RAY = 6;
+/** سقف هاله: اندازه‌ی کلی ستاره حتی برای محبوب‌ترین تاپیک ≤ ۲۴px */
+const GLOW_R_CAP = 12;
+
+type StarTier = {
+  tierOpacity: number;
+  glowR: number;
+  glowOpacity: number;
+  sparkleOpacity: number;
+};
+
+function starTier(likeCount: number): StarTier {
+  if (likeCount >= 10) return { tierOpacity: 1, glowR: GLOW_R_CAP, glowOpacity: 0.55, sparkleOpacity: 0.95 };
+  if (likeCount >= 6) return { tierOpacity: 1, glowR: 9.5, glowOpacity: 0.5, sparkleOpacity: 0.9 };
+  if (likeCount >= 1) return { tierOpacity: 0.85, glowR: 8.5, glowOpacity: 0.42, sparkleOpacity: 0.75 };
+  return { tierOpacity: 0.55, glowR: 7.5, glowOpacity: 0.35, sparkleOpacity: 0.5 };
 }
 
-function buildSky(topics: SkyTopic[]) {
-  const PADDING = 10;
-  return topics.map((topic) => {
-    const x = PADDING + seededUnit(topic.id, 7) * (100 - PADDING * 2);
-    const y = PADDING + seededUnit(topic.id, 29) * (100 - PADDING * 2);
-    const glow = glowLevel(topic.likeCount);
-    return { ...topic, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, size: glow.size, opacity: glow.opacity, bright: glow.bright };
-  }) as StarPlacement[];
+/** چشمک‌زدن: مدت ۲ تا ۴ ثانیه و تأخیر شروع متفاوت — همه از seed ستاره */
+function twinkleParams(topicId: string) {
+  return {
+    duration: 2 + seededUnit(topicId, 53) * 2,
+    delay: seededUnit(topicId, 97) * 3,
+  };
 }
 
-function constellationLines(stars: StarPlacement[], maxDistance = 30) {
-  const pairs: Array<{ a: StarPlacement; b: StarPlacement; distance: number }> = [];
+type PixelStar = Star & StarTier & { x: number; y: number; duration: number; delay: number };
+
+type ConstellationLine = { key: string; x1: number; y1: number; x2: number; y2: number };
+
+/**
+ * خطوط صورت فلکی: فقط بین ستاره‌هایی که فاصله‌شان کمتر از ۲۵٪ عرض باکس است،
+ * و هر ستاره حداکثر به ۲ همسایه وصل می‌شود تا خطوط از کنار هم رد نشود.
+ */
+function buildConstellation(stars: PixelStar[], boxWidth: number): ConstellationLine[] {
+  const maxDistance = boxWidth * 0.25;
+  const candidates: Array<ConstellationLine & { distance: number; aId: string; bId: string }> = [];
+
   for (let i = 0; i < stars.length; i += 1) {
     for (let j = i + 1; j < stars.length; j += 1) {
-      const dx = stars[i].x - stars[j].x;
-      const dy = stars[i].y - stars[j].y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance <= maxDistance) {
-        pairs.push({ a: stars[i], b: stars[j], distance });
+      const distance = Math.hypot(stars[i].x - stars[j].x, stars[i].y - stars[j].y);
+      if (distance < maxDistance) {
+        candidates.push({
+          key: `${stars[i].id}:${stars[j].id}`,
+          x1: stars[i].x,
+          y1: stars[i].y,
+          x2: stars[j].x,
+          y2: stars[j].y,
+          distance,
+          aId: stars[i].id,
+          bId: stars[j].id,
+        });
       }
     }
   }
-  // فقط چند تا از نزدیک‌ترین جفت‌ها، تا شلوغ نشود
-  pairs.sort((a, b) => a.distance - b.distance);
-  return pairs.slice(0, Math.max(stars.length - 1, 0) + 2);
+
+  candidates.sort((a, b) => a.distance - b.distance);
+
+  const degree = new Map<string, number>();
+  const kept: ConstellationLine[] = [];
+  for (const candidate of candidates) {
+    const degreeA = degree.get(candidate.aId) ?? 0;
+    const degreeB = degree.get(candidate.bId) ?? 0;
+    if (degreeA < 2 && degreeB < 2) {
+      degree.set(candidate.aId, degreeA + 1);
+      degree.set(candidate.bId, degreeB + 1);
+      kept.push({ key: candidate.key, x1: candidate.x1, y1: candidate.y1, x2: candidate.x2, y2: candidate.y2 });
+    }
+  }
+  return kept;
 }
 
 type PersonalSkyProps = {
@@ -86,9 +135,40 @@ type PersonalSkyProps = {
 };
 
 export function PersonalSky({ displayName, topics, isOwnProfile }: PersonalSkyProps) {
-  const [hovered, setHovered] = useState<StarPlacement | null>(null);
-  const stars = buildSky(topics);
-  const lines = stars.length > 1 ? constellationLines(stars) : [];
+  const [hovered, setHovered] = useState<Star | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  /** اندازه‌ی واقعی باکس — چون SVG توی فضای پیکسلی کشیده می‌شود، دایره‌ها همیشه دایره می‌مانند */
+  const [size, setSize] = useState({ width: 760, height: 300 });
+
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect && rect.width > 0 && rect.height > 0) {
+        setSize({ width: rect.width, height: rect.height });
+      }
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+
+  const stars = useMemo(() => buildStars(topics), [topics]);
+
+  const pixelStars: PixelStar[] = useMemo(
+    () =>
+      stars.map((star) => ({
+        ...star,
+        ...starTier(star.likeCount),
+        ...twinkleParams(star.id),
+        x: Math.round(star.fx * size.width * 10) / 10,
+        y: Math.round(star.fy * size.height * 10) / 10,
+      })),
+    [stars, size],
+  );
+
+  const lines = useMemo(() => buildConstellation(pixelStars, size.width), [pixelStars, size.width]);
+
   const totalLikes = topics.reduce((sum, topic) => sum + topic.likeCount, 0);
   const brightest = topics.length > 0 ? topics.reduce((max, topic) => (topic.likeCount > max.likeCount ? topic : max)).likeCount : 0;
 
@@ -135,105 +215,119 @@ export function PersonalSky({ displayName, topics, isOwnProfile }: PersonalSkyPr
       ) : (
         <>
           <div className="relative mx-4 mt-4 sm:mx-5">
-            <svg
-              viewBox="0 0 100 100"
-              preserveAspectRatio="none"
-              className="h-[128px] w-full rounded-xl border border-white/5 sm:h-[300px]"
-              role="img"
-              aria-label={`آسمان ستاره‌های ${displayName}`}
-            >
-              {/* خطوط صورت فلکی */}
-              {lines.map(({ a, b }) => (
-                <line
-                  key={`${a.id}-${b.id}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke="#7C3AED"
-                  strokeWidth={0.6 / 3}
-                  strokeOpacity={0.28}
-                  vectorEffect="non-scaling-stroke"
-                  style={{ strokeWidth: 0.35 }}
+            <div ref={boxRef} className="relative h-[200px] w-full sm:h-[300px]">
+              <svg
+                viewBox={`0 0 ${Math.round(size.width)} ${Math.round(size.height)}`}
+                className="h-full w-full rounded-xl border border-white/5"
+                role="img"
+                aria-label={`آسمان ستاره‌های ${displayName}`}
+              >
+                <defs>
+                  {/* هاله‌ی بنفش — گرادیان نسبی به هر دایره، پس با سقف شعاع سازگار است */}
+                  <radialGradient id="offgrid-sky-glow">
+                    <stop offset="0%" stopColor="#C084FC" stopOpacity="0.55" />
+                    <stop offset="45%" stopColor="#A855F7" stopOpacity="0.22" />
+                    <stop offset="100%" stopColor="#A855F7" stopOpacity="0" />
+                  </radialGradient>
+                </defs>
+
+                {/* غبار ستاره‌ای محو */}
+                {DUST.map((dust, index) => (
+                  <circle
+                    key={index}
+                    cx={dust.fx * size.width}
+                    cy={dust.fy * size.height}
+                    r={dust.r}
+                    fill="#8B7AB8"
+                    opacity={dust.opacity}
+                  />
+                ))}
+
+                {/* خطوط صورت فلکی — نازک، بنفش، ۲۰٪ شفافیت */}
+                {lines.map((line) => (
+                  <line
+                    key={line.key}
+                    x1={line.x1}
+                    y1={line.y1}
+                    x2={line.x2}
+                    y2={line.y2}
+                    stroke="#A855F7"
+                    strokeOpacity={0.2}
+                    strokeWidth={1}
+                  />
+                ))}
+
+                {/* ستاره‌ها */}
+                {pixelStars.map((star, index) => (
+                  <motion.g
+                    key={star.id}
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ opacity: star.tierOpacity, scale: 1 }}
+                    transition={{ delay: 0.15 + index * 0.06, type: "spring", stiffness: 320, damping: 18 }}
+                    style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                  >
+                    <g
+                      className="star-twinkle"
+                      style={
+                        {
+                          "--tw-dur": `${star.duration.toFixed(2)}s`,
+                          "--tw-delay": `${star.delay.toFixed(2)}s`,
+                        } as CSSProperties
+                      }
+                    >
+                      {/* هاله */}
+                      <circle cx={star.x} cy={star.y} r={star.glowR} fill="url(#offgrid-sky-glow)" opacity={star.glowOpacity} />
+                      {/* جرقه‌ی چهارپره */}
+                      <path
+                        d={`M${star.x - SPARKLE_RAY} ${star.y} H${star.x + SPARKLE_RAY} M${star.x} ${star.y - SPARKLE_RAY} V${star.y + SPARKLE_RAY}`}
+                        stroke="#C084FC"
+                        strokeWidth={1}
+                        strokeLinecap="round"
+                        opacity={star.sparkleOpacity}
+                      />
+                      {/* هسته‌ی تیز سفید-بنفش */}
+                      <circle cx={star.x} cy={star.y} r={CORE_R} fill="#E9D5FF" />
+                      {/* حلقه‌ی هاور */}
+                      {hovered?.id === star.id ? (
+                        <circle cx={star.x} cy={star.y} r={9} fill="none" stroke="#C084FC" strokeOpacity={0.6} strokeWidth={1} />
+                      ) : null}
+                    </g>
+                  </motion.g>
+                ))}
+              </svg>
+
+              {/* لایه‌ی تعامل: هاور + کلیک روی همان جای ستاره‌ها */}
+              {stars.map((star) => (
+                <Link
+                  key={star.id}
+                  href={`/t/${star.id}`}
+                  aria-label={`${star.title} — ${star.likeCount} فانوس`}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform duration-200 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-400"
+                  style={{ insetInlineStart: `${star.fx * 100}%`, top: `${star.fy * 100}%`, width: 30, height: 30 }}
+                  onMouseEnter={() => setHovered(star)}
+                  onMouseLeave={() => setHovered(null)}
+                  onFocus={() => setHovered(star)}
+                  onBlur={() => setHovered(null)}
                 />
               ))}
 
-              {/* ستاره‌ها */}
-              {stars.map((star, index) => (
-                <g key={star.id}>
-                  {star.bright ? (
-                    <circle cx={star.x} cy={star.y} r={star.size * 2.6} fill="#A855F7" opacity={0.12} />
-                  ) : null}
-                  <motion.circle
-                    cx={star.x}
-                    cy={star.y}
-                    r={Math.max(star.size * 2.4, 5.5)}
-                    fill={nebulaColor(star.likeCount)}
-                    fillOpacity={0.28}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ opacity: hovered?.id === star.id ? 0.4 : 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                    style={{ transformBox: "fill-box", transformOrigin: "center" }}
-                  />
-                  {star.bright ? (
-                    <motion.circle
-                      cx={star.x}
-                      cy={star.y}
-                      r={star.size * 1.8}
-                      fill="none"
-                      stroke="#C084FC"
-                      strokeWidth={0.25}
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: [0, 0.6, 0.25, 0.6, 0.25], scale: 1 }}
-                      transition={{ delay: 0.08 * index + 0.45, duration: 3.2, repeat: Infinity }}
-                      style={{ transformBox: "fill-box", transformOrigin: "center" }}
-                    />
-                  ) : null}
-                  <motion.circle
-                    cx={star.x}
-                    cy={star.y}
-                    r={star.size}
-                    fill={star.likeCount >= 1 ? "#E9D5FF" : "#C4B5FD"}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ opacity: star.opacity, scale: 1 }}
-                    transition={{ delay: 0.08 * index + 0.2, type: "spring", stiffness: 380, damping: 16 }}
-                    style={{ transformBox: "fill-box", transformOrigin: "center", filter: star.bright ? "drop-shadow(0 0 3px rgba(168,85,247,0.9))" : undefined }}
-                  />
-                </g>
-              ))}
-            </svg>
-
-            {/* لایه‌ی تعامل: هاور + کلیک روی همان جای ستاره‌ها */}
-            {stars.map((star) => (
-              <Link
-                key={star.id}
-                href={`/t/${star.id}`}
-                aria-label={`${star.title} — ${star.likeCount} فانوس`}
-                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform duration-200 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-400"
-                style={{ insetInlineStart: `${star.x}%`, top: `${star.y}%`, width: 30, height: 30 }}
-                onMouseEnter={() => setHovered(star)}
-                onMouseLeave={() => setHovered(null)}
-                onFocus={() => setHovered(star)}
-                onBlur={() => setHovered(null)}
-              />
-            ))}
-
-            {/* تولتیپ */}
-            {hovered ? (
-              <div
-                className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-lg border border-purple-400/30 bg-zinc-950/95 px-3 py-1.5 text-xs text-zinc-100 shadow-lg shadow-black/50 backdrop-blur-sm"
-                style={{
-                  insetInlineStart: `${Math.min(Math.max(hovered.x, 16), 84)}%`,
-                  top: `${hovered.y}%`,
-                  marginTop: -14,
-                }}
-              >
-                <span className="block max-w-[220px] truncate font-medium">{hovered.title}</span>
-                <span className="mt-0.5 block text-[10px] text-purple-300">
-                  {hovered.likeCount} فانوس · {hovered.replyCount} پاسخ{hovered.solved ? " · حل‌شده ✓" : ""}
-                </span>
-              </div>
-            ) : null}
+              {/* تولتیپ */}
+              {hovered ? (
+                <div
+                  className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-lg border border-purple-400/30 bg-zinc-950/95 px-3 py-1.5 text-xs text-zinc-100 shadow-lg shadow-black/50 backdrop-blur-sm"
+                  style={{
+                    insetInlineStart: `${Math.min(Math.max(hovered.fx * 100, 16), 84)}%`,
+                    top: `${hovered.fy * 100}%`,
+                    marginTop: -14,
+                  }}
+                >
+                  <span className="block max-w-[220px] truncate font-medium">{hovered.title}</span>
+                  <span className="mt-0.5 block text-[10px] text-purple-300">
+                    {hovered.likeCount} فانوس · {hovered.replyCount} پاسخ{hovered.solved ? " · حل‌شده ✓" : ""}
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {/* آمار پایین آسمان */}
