@@ -16,9 +16,14 @@ export async function createClient() {
         return cookieStore.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          cookieStore.set(name, value, options);
-        });
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // setAll از داخل یک Server Component صدا زده شده.
+          // رفرش نشان‌ها توسط middleware انجام می‌شود؛ اینجا مشکلی نیست.
+        }
       },
     },
   });

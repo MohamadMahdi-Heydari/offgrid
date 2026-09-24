@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { CheckCheck, MessageCircle, Pin, Tag } from "lucide-react";
+import { OffgridLantern } from "@/components/brand/offgrid-lantern";
 
 type TopicItem = {
   id: string;
@@ -41,15 +42,19 @@ export function TopicFeed({ topics }: { topics: TopicItem[] }) {
           className="rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/70 p-6 transition-colors duration-200 hover:bg-[color:var(--surface)]"
         >
           <div className="flex gap-4">
-            <div className="flex min-w-16 flex-col items-center justify-center rounded-xl border border-white/10 bg-zinc-950/70 px-2 py-3 text-center">
-              <button type="button" aria-label="لایک" className="text-purple-300 hover:text-purple-200">
-                ▲
-              </button>
-              <span className="my-1 text-sm font-semibold text-zinc-100">{topic.likeCount}</span>
-              <button type="button" aria-label="دیسلایک" className="text-zinc-500 hover:text-red-400">
-                ▼
-              </button>
-            </div>
+            <Link
+              href={`/t/${topic.id}`}
+              title="مشاهده تاپیک و روشن کردن فانوس"
+              className="group/lantern flex min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl border border-white/10 bg-zinc-950/70 px-2 py-3 text-center transition-colors hover:border-purple-400/40"
+            >
+              <span className="text-purple-300/90 transition-colors group-hover/lantern:text-purple-200">
+                <OffgridLantern lit={topic.likeCount > 0} tone="purple" size={15} />
+              </span>
+              <span className="my-0.5 text-sm font-semibold text-zinc-100">{topic.likeCount}</span>
+              <span className="rotate-180 text-zinc-600 transition-colors group-hover/lantern:text-red-400/80">
+                <OffgridLantern tone="red" size={15} />
+              </span>
+            </Link>
 
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">

@@ -301,18 +301,20 @@ export async function getTopicById(id: string) {
 
     if (error || !topic) return null;
 
-    const [categoryResult, authorResult, reactionResult] = await Promise.all([
+    const [categoryResult, authorResult] = await Promise.all([
       topic.category_id
         ? supabase.from("categories").select("name,slug").eq("id", topic.category_id).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
       topic.author_id
         ? supabase.from("profiles").select("username,role").eq("id", topic.author_id).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
-      supabase.from("reactions").select("value").eq("target_type", "topic").eq("target_id", topic.id),
     ]);
 
-    const topicLikeCount = (reactionResult.data ?? []).filter((row) => row.value === 1).length;
-    const topicDislikeCount = (reactionResult.data ?? []).filter((row) => row.value === -1).length;
+    // شمارنده‌های لایک/دیسلایک توسط تریگر reactions_like_count_trigger روی سطر
+    // تاپیک به‌روز نگه داشته می‌شوند؛ خواندن مستقیم جدول reactions با نقش anon
+    // به‌خاطر RLS همیشه خالی برمی‌گردد.
+    const topicLikeCount = topic.like_count ?? 0;
+    const topicDislikeCount = topic.dislike_count ?? 0;
 
     return {
       id: topic.id,

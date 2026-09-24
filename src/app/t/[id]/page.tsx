@@ -29,16 +29,26 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
   const user = userResult.data.user;
   const canSelectBest = Boolean(user && topic.authorId === user.id && topic.type === "question");
 
-  const { data: currentReaction } = user
+  // واکنش‌های کاربر فعلی به این تاپیک و پاسخ‌هایش — در یک کوئری.
+  // سقف ۱۰۰ پاسخ برای هایلایت کافی است و طول URL درخواست را امن نگه می‌دارد.
+  const replyIds = replies.slice(0, 100).map((reply) => reply.id);
+  const { data: viewerReactionRows } = user
     ? await supabase
         .from("reactions")
-        .select("value")
+        .select("target_type,target_id,value")
         .eq("user_id", user.id)
-        .eq("target_type", "topic")
-        .eq("target_id", topic.id)
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
+        .in("target_id", [topic.id, ...replyIds])
+    : { data: [] as { target_type: string; target_id: string; value: number }[] };
+
+  const currentTopicReaction = (viewerReactionRows ?? []).find(
+    (row) => row.target_type === "topic" && row.target_id === topic.id,
+  )?.value;
+
+  const viewerReplyReactions = Object.fromEntries(
+    (viewerReactionRows ?? [])
+      .filter((row) => row.target_type === "reply" && (row.value === 1 || row.value === -1))
+      .map((row) => [row.target_id, row.value as 1 | -1]),
+  );
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
@@ -69,7 +79,7 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
           topicId={topic.id}
           initialLikeCount={topic.likeCount}
           initialDislikeCount={topic.dislikeCount}
-          initialReaction={currentReaction?.value === 1 ? 1 : currentReaction?.value === -1 ? -1 : 0}
+          initialReaction={currentTopicReaction === 1 ? 1 : currentTopicReaction === -1 ? -1 : 0}
         />
 
         <div className="mt-2 text-xs text-zinc-400">{topic.replyCount} پاسخ</div>
@@ -99,7 +109,13 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
         )}
       </section>
 
-      <ReplyTree topicId={topic.id} replies={replies} bestReplyId={topic.bestReplyId} canSelectBest={canSelectBest} />
+      <ReplyTree
+        topicId={topic.id}
+        replies={replies}
+        bestReplyId={topic.bestReplyId}
+        canSelectBest={canSelectBest}
+        viewerReactions={viewerReplyReactions}
+      />
     </main>
   );
 }

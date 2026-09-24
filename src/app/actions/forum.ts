@@ -237,45 +237,44 @@ export async function createReplyAction(formData: FormData) {
   }
 }
 
-async function syncReactionCounts(targetType: "topic" | "reply", targetId: string) {
-  const supabase = await createClient();
-  const { data: reactions } = await supabase.from("reactions").select("value").eq("target_type", targetType).eq("target_id", targetId);
+const reactionTargetSchema = z.object({
+  targetType: z.enum(["topic", "reply"]),
+  targetId: z.string().uuid("شناسه هدف نامعتبر است"),
+  topicId: z.string().uuid("شناسه تاپیک نامعتبر است"),
+  value: z.union([z.literal(1), z.literal(-1)]),
+});
 
-  const likeCount = (reactions ?? []).filter((row) => row.value === 1).length;
-  const dislikeCount = (reactions ?? []).filter((row) => row.value === -1).length;
+export type ToggleReactionResult = {
+  likeCount: number;
+  dislikeCount: number;
+  current: 1 | -1 | 0;
+};
 
-  if (targetType === "topic") {
-    await supabase.from("topics").update({ like_count: likeCount, dislike_count: dislikeCount }).eq("id", targetId);
-  } else {
-    await supabase.from("replies").update({ like_count: likeCount, dislike_count: dislikeCount }).eq("id", targetId);
-  }
-}
-
-export async function toggleReactionAction(formData: FormData) {
+/**
+ * روشن/خاموش کردن «فانوس» یک تاپیک یا پاسخ (لایک/دیسلایک با منطق toggle).
+ * شمارنده‌ها توسط تریگر reactions_like_count_trigger روی سطر هدف نگه‌داری می‌شوند.
+ */
+export async function toggleReactionTargetAction(input: {
+  targetType: "topic" | "reply";
+  targetId: string;
+  topicId: string;
+  value: 1 | -1;
+}): Promise<ToggleReactionResult> {
   try {
-    console.log("[TOGGLE REACTION]", {
-      target_type: formData.get("target_type"),
-      target_id: formData.get("target_id"),
-      value: formData.get("value"),
-    });
+    const parsed = reactionTargetSchema.safeParse(input);
+    if (!parsed.success) {
+      throw new Error(parsed.error.issues[0]?.message ?? "واکنش نامعتبر است");
+    }
+    const { targetType, targetId, topicId, value } = parsed.data;
 
     const supabase = await createClient();
-    const userResult = await supabase.auth.getUser();
-    const user = userResult.data.user;
-    if (!user) redirect("/login");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const parsed = reactionSchema.safeParse({
-      targetType: formData.get("target_type"),
-      targetId: formData.get("target_id"),
-      topicId: formData.get("topic_id"),
-      value: formData.get("value"),
-    });
-
-    if (!parsed.success) {
-      redirect(`/t/${String(formData.get("topic_id") ?? "")}?error=${encodeURIComponent("واکنش نامعتبر است")}`);
+    if (!user) {
+      redirect("/login");
     }
-
-    const { targetType, targetId, topicId, value } = parsed.data;
 
     const { data: existingReaction } = await supabase
       .from("reactions")
@@ -286,133 +285,58 @@ export async function toggleReactionAction(formData: FormData) {
       .limit(1)
       .maybeSingle();
 
+    let current: 1 | -1 | 0;
+
     if (!existingReaction) {
-      const result = await supabase.from("reactions").insert({
+      const { error } = await supabase.from("reactions").insert({
         user_id: user.id,
         target_type: targetType,
         target_id: targetId,
         value,
       });
-      console.log("[INSERT RESULT]", result);
-      if (result.error) {
-        console.error("toggleReactionAction insert error", {
-          message: result.error.message,
-          details: result.error.details,
-          hint: result.error.hint,
-          code: result.error.code,
-        });
-        redirect(`/t/${topicId}?error=${encodeURIComponent(`واکنش ثبت نشد: ${result.error.message}`)}`);
+      if (error) {
+        console.error("toggleReactionTargetAction insert error", error);
+        throw new Error(
+          error.code === "23505" ? "این واکنش قبلاً ثبت شده است" : "ثبت واکنش انجام نشد؛ دوباره تلاش کن",
+        );
       }
+      current = value;
     } else if (existingReaction.value === value) {
-      const result = await supabase.from("reactions").delete().eq("id", existingReaction.id);
-      console.log("[DELETE RESULT]", result);
-      if (result.error) {
-        console.error("toggleReactionAction delete error", {
-          message: result.error.message,
-          details: result.error.details,
-          hint: result.error.hint,
-          code: result.error.code,
-        });
-        redirect(`/t/${topicId}?error=${encodeURIComponent(`حذف واکنش انجام نشد: ${result.error.message}`)}`);
+      const { error } = await supabase.from("reactions").delete().eq("id", existingReaction.id);
+      if (error) {
+        console.error("toggleReactionTargetAction delete error", error);
+        throw new Error("حذف واکنش انجام نشد؛ دوباره تلاش کن");
       }
+      current = 0;
     } else {
-      const result = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
-      console.log("[UPDATE RESULT]", result);
-      if (result.error) {
-        console.error("toggleReactionAction update error", {
-          message: result.error.message,
-          details: result.error.details,
-          hint: result.error.hint,
-          code: result.error.code,
-        });
-        redirect(`/t/${topicId}?error=${encodeURIComponent(`به‌روزرسانی واکنش انجام نشد: ${result.error.message}`)}`);
+      const { error } = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
+      if (error) {
+        console.error("toggleReactionTargetAction update error", error);
+        throw new Error("به‌روزرسانی واکنش انجام نشد؛ دوباره تلاش کن");
       }
+      current = value;
     }
 
-    await syncReactionCounts(targetType, targetId);
-    revalidatePath(`/t/${topicId}`);
-    revalidatePath("/");
-  } catch (error) {
-    unstable_rethrow(error);
-    console.error("toggleReactionAction unexpected", error);
-  }
-}
-
-export async function toggleTopicReactionAction(input: { topicId: string; value: 1 | -1 }) {
-  try {
-    const supabase = await createClient();
-    const userResult = await supabase.auth.getUser();
-    const user = userResult.data.user;
-
-    const topicId = z.string().uuid().parse(input.topicId);
-    const value = z.union([z.literal(1), z.literal(-1)]).parse(input.value);
-
-    console.log("[TOGGLE ENTER]", {
-      target_type: "topic",
-      target_id: topicId,
-      value,
-    });
-    console.log("[USER]", user?.id);
-
-    if (!user) {
-      throw new Error("کاربر وارد نشده است");
-    }
-
-    const { data: existingReaction } = await supabase
-      .from("reactions")
-      .select("id,value")
-      .eq("user_id", user.id)
-      .eq("target_type", "topic")
-      .eq("target_id", topicId)
+    const table = targetType === "topic" ? "topics" : "replies";
+    const { data: targetRow } = await supabase
+      .from(table)
+      .select("like_count,dislike_count")
+      .eq("id", targetId)
       .limit(1)
       .maybeSingle();
-
-    if (!existingReaction) {
-      const result = await supabase.from("reactions").insert({
-        user_id: user.id,
-        target_type: "topic",
-        target_id: topicId,
-        value,
-      });
-      console.log("[RESULT]", { data: result.data, error: result.error });
-      if (result.error) {
-        throw new Error(
-          `insert failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
-        );
-      }
-    } else if (existingReaction.value === value) {
-      const result = await supabase.from("reactions").delete().eq("id", existingReaction.id);
-      console.log("[RESULT]", { data: result.data, error: result.error });
-      if (result.error) {
-        throw new Error(
-          `delete failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
-        );
-      }
-    } else {
-      const result = await supabase.from("reactions").update({ value }).eq("id", existingReaction.id);
-      console.log("[RESULT]", { data: result.data, error: result.error });
-      if (result.error) {
-        throw new Error(
-          `update failed: ${result.error.message} | details: ${result.error.details ?? "-"} | hint: ${result.error.hint ?? "-"}`,
-        );
-      }
-    }
-
-    await syncReactionCounts("topic", topicId);
-
-    const { data: topic } = await supabase.from("topics").select("like_count,dislike_count").eq("id", topicId).single();
 
     revalidatePath(`/t/${topicId}`);
     revalidatePath("/");
 
     return {
-      likeCount: topic?.like_count ?? 0,
-      dislikeCount: topic?.dislike_count ?? 0,
+      likeCount: typeof targetRow?.like_count === "number" ? targetRow.like_count : 0,
+      dislikeCount: typeof targetRow?.dislike_count === "number" ? targetRow.dislike_count : 0,
+      current,
     };
   } catch (error) {
     unstable_rethrow(error);
-    console.error("toggleTopicReactionAction unexpected", error);
-    throw error;
+    console.error("toggleReactionTargetAction unexpected", error);
+    throw error instanceof Error ? error : new Error("ثبت واکنش انجام نشد؛ دوباره تلاش کن");
   }
 }
 

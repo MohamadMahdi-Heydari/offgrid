@@ -1,14 +1,18 @@
-import { createReplyAction, selectBestReplyAction, toggleReactionAction } from "@/app/actions/forum";
+import { createReplyAction, selectBestReplyAction } from "@/app/actions/forum";
 import { renderMarkdown } from "@/lib/markdown";
 import { formatRelative } from "@/lib/jalali";
 import type { ReplyItem } from "@/lib/forum-data";
 import { getRoleEmoji } from "@/lib/forum-data";
+import { LanternVote } from "@/components/reaction/lantern-vote";
+
+type ViewerReactions = Record<string, 1 | -1>;
 
 type ReplyTreeProps = {
   topicId: string;
   replies: ReplyItem[];
   bestReplyId: string | null;
   canSelectBest: boolean;
+  viewerReactions: ViewerReactions;
 };
 
 function ReplyNode({
@@ -18,6 +22,7 @@ function ReplyNode({
   canSelectBest,
   depth,
   isBest,
+  viewerReactions,
 }: {
   reply: ReplyItem;
   allReplies: ReplyItem[];
@@ -25,6 +30,7 @@ function ReplyNode({
   canSelectBest: boolean;
   depth: number;
   isBest: boolean;
+  viewerReactions: ViewerReactions;
 }) {
   const children = allReplies
     .filter((item) => item.parentId === reply.id)
@@ -44,25 +50,15 @@ function ReplyNode({
         <div className="text-sm leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.body) }} />
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <form action={toggleReactionAction}>
-            <input type="hidden" name="topic_id" value={topicId} />
-            <input type="hidden" name="target_type" value="reply" />
-            <input type="hidden" name="target_id" value={reply.id} />
-            <input type="hidden" name="value" value="1" />
-            <button type="submit" className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-200 hover:bg-white/10">
-              👍 {reply.likeCount}
-            </button>
-          </form>
-
-          <form action={toggleReactionAction}>
-            <input type="hidden" name="topic_id" value={topicId} />
-            <input type="hidden" name="target_type" value="reply" />
-            <input type="hidden" name="target_id" value={reply.id} />
-            <input type="hidden" name="value" value="-1" />
-            <button type="submit" className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-200 hover:bg-white/10">
-              👎 {reply.dislikeCount}
-            </button>
-          </form>
+          <LanternVote
+            targetType="reply"
+            targetId={reply.id}
+            topicId={topicId}
+            initialLikeCount={reply.likeCount}
+            initialDislikeCount={reply.dislikeCount}
+            initialReaction={viewerReactions[reply.id] ?? 0}
+            size="sm"
+          />
 
           {canSelectBest ? (
             <form action={selectBestReplyAction}>
@@ -107,6 +103,7 @@ function ReplyNode({
               canSelectBest={canSelectBest}
               depth={depth + 1}
               isBest={false}
+              viewerReactions={viewerReactions}
             />
           ))}
         </ul>
@@ -115,7 +112,7 @@ function ReplyNode({
   );
 }
 
-export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest }: ReplyTreeProps) {
+export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest, viewerReactions }: ReplyTreeProps) {
   const topLevel = replies.filter((reply) => !reply.parentId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const sortedTopLevel = topLevel.sort((a, b) => {
@@ -143,6 +140,7 @@ export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest }: Repl
               canSelectBest={canSelectBest}
               depth={0}
               isBest={bestReplyId === reply.id}
+              viewerReactions={viewerReactions}
             />
           ))}
         </ul>
