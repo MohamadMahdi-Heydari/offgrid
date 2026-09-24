@@ -49,7 +49,9 @@ async function seed() {
       .values({
         id: legendId,
         username: legendUsername,
-        displayName: "مالک آفگرید",
+        // نام نمایشی عمداً خالی می‌ماند تا نام‌کاربری نمایش داده شود؛
+        // برچسب «سازنده» برای نقش legend در UI به‌صورت خودکار رندر می‌شود.
+        displayName: null,
         role: "legend",
       })
       .onConflictDoNothing();

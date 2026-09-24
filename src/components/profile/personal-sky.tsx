@@ -202,7 +202,10 @@ export function PersonalSky({ displayName, topics, isOwnProfile }: PersonalSkyPr
             ))}
           </div>
           <Flame className="relative h-8 w-8 text-zinc-600" aria-hidden="true" />
-          <p className="relative mt-3 text-sm text-zinc-500">آسمانت هنوز خالیه. اولین ستاره رو روشن کن.</p>
+          {/* پیام خالی فقط برای صاحب آسمان شخصی‌سازی می‌شود؛ بیننده‌ها و مهمان‌ها حالت خنثی می‌بینند */}
+          <p className="relative mt-3 text-sm text-zinc-500">
+            {isOwnProfile ? "آسمانت هنوز خالیه. اولین ستاره رو روشن کن." : `آسمان ${displayName} هنوز خالیه.`}
+          </p>
           {isOwnProfile ? (
             <Link
               href="/new"

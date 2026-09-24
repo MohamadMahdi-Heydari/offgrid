@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Crown } from "lucide-react";
 import { toggleFollowUserAction } from "@/app/actions/forum";
 import { TopicFeed } from "@/components/topic/topic-feed";
 import { PersonalSky } from "@/components/profile/personal-sky";
@@ -38,6 +39,9 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
   ]);
 
   const isFollowing = Boolean(followResult.data);
+  // پیام‌های حالت خالی فقط وقتی شخصی‌سازی می‌شوند که بیننده، خودِ صاحب پروفایل باشد
+  const isOwner = Boolean(user && user.id === profile.id);
+  const displayName = profile.displayName || profile.username;
 
   const mappedTopics = topics.map((topic) => ({ ...topic, createdAtLabel: formatRelative(topic.createdAt) }));
 
@@ -54,8 +58,14 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               )}
             </div>
             <div>
+              {profile.role === "legend" ? (
+                <span className="mb-1.5 inline-flex items-center gap-1 rounded-full border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#3B82F6]">
+                  <Crown className="h-3 w-3" aria-hidden="true" />
+                  سازنده
+                </span>
+              ) : null}
               <h1 className="text-2xl font-bold text-zinc-50">
-                {profile.displayName || profile.username} {getRoleEmoji(profile.role)}
+                {displayName} {getRoleEmoji(profile.role)}
               </h1>
               <p className="text-sm text-zinc-400">@{profile.username}</p>
               <p className="mt-1 text-sm text-zinc-300">{profile.bio || "بیویی ثبت نشده."}</p>
@@ -83,7 +93,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
       </section>
 
       <PersonalSky
-        displayName={profile.displayName || profile.username}
+        displayName={displayName}
         topics={topics.map((topic) => ({
           id: topic.id,
           title: topic.title,
@@ -93,7 +103,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
           solved: topic.solved,
           categoryName: topic.category,
         }))}
-        isOwnProfile={Boolean(user && user.id === profile.id)}
+        isOwnProfile={isOwner}
       />
 
       <section className="mt-8">
@@ -103,7 +113,20 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
             بازگشت به فید
           </Link>
         </div>
-        <TopicFeed topics={mappedTopics} />
+        <TopicFeed
+          topics={mappedTopics}
+          emptyState={
+            isOwner
+              ? {
+                  title: "هنوز تاپیکی نساختی. اولین فانوس رو روشن کن.",
+                  actionHref: "/new",
+                  actionLabel: "تاپیک جدید",
+                }
+              : {
+                  title: `${displayName} هنوز تاپیکی نساخته.`,
+                }
+          }
+        />
       </section>
     </main>
   );

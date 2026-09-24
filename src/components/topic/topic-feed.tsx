@@ -22,15 +22,32 @@ type TopicItem = {
   solved: boolean;
 };
 
-export function TopicFeed({ topics }: { topics: TopicItem[] }) {
+export type FeedEmptyState = {
+  /** پیام اصلی حالت خالی */
+  title: string;
+  description?: string;
+  /** بدون actionHref/actionLabel دکمه‌ای نمایش داده نمی‌شود */
+  actionHref?: string;
+  actionLabel?: string;
+};
+
+const DEFAULT_EMPTY_STATE: FeedEmptyState = {
+  title: "هنوز تاپیکی نیست. اولین فانوس رو روشن کن.",
+  description: "با ساخت اولین تاپیک، گفت‌وگوی این بخش را شروع کن.",
+  actionHref: "/new",
+  actionLabel: "ساخت تاپیک",
+};
+
+export function TopicFeed({ topics, emptyState }: { topics: TopicItem[]; emptyState?: FeedEmptyState }) {
   if (topics.length === 0) {
+    const empty = emptyState ?? DEFAULT_EMPTY_STATE;
     return (
       <EmptyState
         icon={Flame}
-        title="هنوز تاپیکی نیست. اولین فانوس رو روشن کن."
-        description="با ساخت اولین تاپیک، گفت‌وگوی این بخش را شروع کن."
-        actionHref="/new"
-        actionLabel="ساخت تاپیک"
+        title={empty.title}
+        description={empty.description}
+        actionHref={empty.actionHref}
+        actionLabel={empty.actionLabel}
       />
     );
   }
