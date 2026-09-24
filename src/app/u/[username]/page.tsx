@@ -1,10 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Crown } from "lucide-react";
 import { toggleFollowUserAction } from "@/app/actions/forum";
 import { TopicFeed } from "@/components/topic/topic-feed";
 import { PersonalSky } from "@/components/profile/personal-sky";
+import { FirstFlame } from "@/components/brand/first-flame";
 import { createClient } from "@/lib/supabase/server";
 import { formatJalali, formatRelative } from "@/lib/jalali";
 import { getPublicProfileByUsername, getRoleEmoji, getTopicsByAuthor } from "@/lib/forum-data";
@@ -60,7 +60,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
             <div>
               {profile.role === "legend" ? (
                 <span className="mb-1.5 inline-flex items-center gap-1 rounded-full border border-[#3B82F6]/40 bg-[#3B82F6]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#3B82F6]">
-                  <Crown className="h-3 w-3" aria-hidden="true" />
+                  <FirstFlame className="h-3.5 w-3.5" />
                   سازنده
                 </span>
               ) : null}

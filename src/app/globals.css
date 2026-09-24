@@ -180,10 +180,28 @@ select {
   animation: star-twinkle var(--tw-dur, 3s) ease-in-out var(--tw-delay, 0s) infinite;
 }
 
+/* ===== شعله‌ی نخست (نشان سازنده) ===== */
+
+/* نبض ملایم هسته‌ی شعله */
+@keyframes flame-core {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.flame-core {
+  animation: flame-core 2.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lantern-hero-glow,
   .lantern-lit .lantern-flame,
-  .star-twinkle {
+  .star-twinkle,
+  .flame-core {
     animation: none;
   }
   .lantern-burst,

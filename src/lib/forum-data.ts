@@ -76,7 +76,9 @@ export type PublicProfile = {
 };
 
 function roleToEmoji(role: string | null) {
-  if (role === "legend") return "👑";
+  // نشان افسانه دیگر ایموجی نیست؛ «شعله‌ی نخست» (FirstFlame) جایگزینش است
+  // تا کنار بج «سازنده» دو بار تکرار نشود.
+  if (role === "legend") return "";
   if (role === "admin") return "⚙️";
   if (role === "moderator") return "🛡️";
   return "";
