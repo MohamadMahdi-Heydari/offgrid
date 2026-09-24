@@ -197,11 +197,29 @@ select {
   animation: flame-core 2.6s ease-in-out infinite;
 }
 
+/* ===== نگین سازنده (Creator's Ember) ===== */
+
+/* نبض ملایم حلقه‌ی آبی — opacity بین ۰٫۴ تا ۰٫۷ هر ۳ ثانیه */
+@keyframes ember-ring-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.ember-ring {
+  animation: ember-ring-pulse 3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lantern-hero-glow,
   .lantern-lit .lantern-flame,
   .star-twinkle,
-  .flame-core {
+  .flame-core,
+  .ember-ring {
     animation: none;
   }
   .lantern-burst,

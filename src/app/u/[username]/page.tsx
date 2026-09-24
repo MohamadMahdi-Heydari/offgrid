@@ -5,6 +5,7 @@ import { toggleFollowUserAction } from "@/app/actions/forum";
 import { TopicFeed } from "@/components/topic/topic-feed";
 import { PersonalSky } from "@/components/profile/personal-sky";
 import { FirstFlame } from "@/components/brand/first-flame";
+import { CreatorEmber } from "@/components/brand/creator-ember";
 import { createClient } from "@/lib/supabase/server";
 import { formatJalali, formatRelative } from "@/lib/jalali";
 import { getPublicProfileByUsername, getRoleEmoji, getTopicsByAuthor } from "@/lib/forum-data";
@@ -64,8 +65,12 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
                   سازنده
                 </span>
               ) : null}
-              <h1 className="text-2xl font-bold text-zinc-50">
-                {displayName} {getRoleEmoji(profile.role)}
+              <h1 className="group/name text-2xl font-bold text-zinc-50">
+                {displayName}
+                {profile.role === "legend" ? (
+                  <CreatorEmber className="ms-2 inline-block h-6 w-6 align-middle transition-[transform,filter] duration-300 group-hover/name:scale-110 group-hover/name:drop-shadow-[0_0_8px_rgba(96,165,250,0.85)]" />
+                ) : null}
+                {getRoleEmoji(profile.role) ? ` ${getRoleEmoji(profile.role)}` : null}
               </h1>
               <p className="text-sm text-zinc-400">@{profile.username}</p>
               <p className="mt-1 text-sm text-zinc-300">{profile.bio || "بیویی ثبت نشده."}</p>
