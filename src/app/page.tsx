@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { UserRoundPlus } from "lucide-react";
 import { CategoryNav } from "@/components/topic/category-nav";
 import { TopicFeed } from "@/components/topic/topic-feed";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatRelative } from "@/lib/jalali";
 import { getTopicsFeed } from "@/lib/forum-data";
 
@@ -64,10 +66,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       <CategoryNav />
 
       {selectedTab === "following" ? (
-        <section className="mt-4 rounded-2xl border border-dashed border-white/15 bg-[color:var(--surface)]/50 p-10 text-center">
-          <p className="text-lg font-semibold text-zinc-100">فید دنبال‌شده‌ها به‌زودی فعال می‌شود</p>
-          <p className="mt-2 text-sm text-zinc-400">در فاز بعدی، تاپیک‌های کاربران و موضوعات دنبال‌شده اینجا نمایش داده می‌شود.</p>
-        </section>
+        <EmptyState
+          icon={UserRoundPlus}
+          title="فید دنبال‌شده‌ها به‌زودی فعال می‌شود"
+          description="از پروفایل کاربرانی که دوست داری بازدید کن و دنبالشان کن تا اینجا جان بگیرد."
+        />
       ) : (
         <TopicFeed topics={mappedTopics} />
       )}

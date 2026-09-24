@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CheckCheck, MessageCircle, Pin, Tag } from "lucide-react";
+import { CheckCheck, Flame, MessageCircle, Pin, Tag } from "lucide-react";
 import { OffgridLantern } from "@/components/brand/offgrid-lantern";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type TopicItem = {
   id: string;
@@ -24,10 +25,13 @@ type TopicItem = {
 export function TopicFeed({ topics }: { topics: TopicItem[] }) {
   if (topics.length === 0) {
     return (
-      <section className="mt-4 rounded-2xl border border-dashed border-white/15 bg-[color:var(--surface)]/50 p-10 text-center">
-        <p className="text-lg font-semibold text-zinc-100">هنوز تاپیکی نیست، اولین نفر باش</p>
-        <p className="mt-2 text-sm text-zinc-400">با ساخت اولین تاپیک، گفت‌وگوی این بخش را شروع کن.</p>
-      </section>
+      <EmptyState
+        icon={Flame}
+        title="هنوز تاپیکی نیست. اولین فانوس رو روشن کن."
+        description="با ساخت اولین تاپیک، گفت‌وگوی این بخش را شروع کن."
+        actionHref="/new"
+        actionLabel="ساخت تاپیک"
+      />
     );
   }
 
@@ -39,7 +43,7 @@ export function TopicFeed({ topics }: { topics: TopicItem[] }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: index * 0.04 }}
-          className="rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/70 p-6 transition-colors duration-200 hover:bg-[color:var(--surface)]"
+          className="rounded-2xl border border-transparent bg-[color:var(--surface)]/70 p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--border)] hover:bg-[color:var(--surface)]"
         >
           <div className="flex gap-4">
             <Link

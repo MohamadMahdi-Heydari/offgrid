@@ -418,7 +418,7 @@ export async function getPublicProfileByUsername(username: string) {
   }
 }
 
-export async function getTopicsByAuthor(authorId: string, limit = 20) {
+export async function getTopicsByAuthor(authorId: string, limit = 50) {
   try {
     const supabase = createSupabasePublicClient();
     const { data, error } = await supabase
@@ -431,7 +431,8 @@ export async function getTopicsByAuthor(authorId: string, limit = 20) {
 
     if (error) return [] as FeedTopic[];
     return mapTopics((data ?? []) as RawTopic[]);
-  } catch {
+  } catch (error) {
+    console.error("getTopicsByAuthor unexpected", error);
     return [] as FeedTopic[];
   }
 }

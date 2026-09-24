@@ -146,7 +146,25 @@ select {
   transform: rotate(0deg) scale(0.92);
 }
 
+/* ===== صفحه‌ی ۴۰۴ ===== */
+
+/* گلو نرم فانوسِ خاموشِ ۴۰۴ */
+@keyframes lantern-icon-glow {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.lantern-hero-glow {
+  animation: lantern-icon-glow 2.4s ease-in-out 0.8s infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .lantern-hero-glow,
   .lantern-lit .lantern-flame {
     animation: none;
   }

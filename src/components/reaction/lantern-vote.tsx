@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useOptimistic, useState, useTransition, type CSSProperties } from "react";
+import { useOptimistic, useState, useTransition, type CSSProperties } from "react";
 import { toggleReactionTargetAction } from "@/app/actions/forum";
 import { OffgridLantern } from "@/components/brand/offgrid-lantern";
 
@@ -75,14 +75,17 @@ export function LanternVote({
     current: initialReaction,
   });
 
-  // همگام‌سازی با props تازه بعد از revalidate روت
-  useEffect(() => {
+  // همگام‌سازی با props تازه بعد از revalidate روت — الگوی adjusting-during-render
+  const propsKey = `${initialLikeCount}:${initialDislikeCount}:${initialReaction}`;
+  const [lastPropsKey, setLastPropsKey] = useState(propsKey);
+  if (propsKey !== lastPropsKey) {
+    setLastPropsKey(propsKey);
     setBaseState({
       likeCount: initialLikeCount,
       dislikeCount: initialDislikeCount,
       current: initialReaction,
     });
-  }, [initialLikeCount, initialDislikeCount, initialReaction]);
+  }
 
   const [view, addOptimistic] = useOptimistic<VoteState, 1 | -1>(baseState, applyVote);
   const [isPending, startTransition] = useTransition();

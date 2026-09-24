@@ -1,9 +1,11 @@
+import { MessageCirclePlus } from "lucide-react";
 import { createReplyAction, selectBestReplyAction } from "@/app/actions/forum";
 import { renderMarkdown } from "@/lib/markdown";
 import { formatRelative } from "@/lib/jalali";
 import type { ReplyItem } from "@/lib/forum-data";
 import { getRoleEmoji } from "@/lib/forum-data";
 import { LanternVote } from "@/components/reaction/lantern-vote";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type ViewerReactions = Record<string, 1 | -1>;
 
@@ -84,7 +86,10 @@ function ReplyNode({
                 className="w-full rounded-lg border border-white/10 bg-zinc-950/70 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:ring-2 focus:ring-purple-500/60"
                 placeholder="پاسخت رو بنویس..."
               />
-              <button type="submit" className="rounded-lg bg-purple-500 px-3 py-1.5 text-xs text-white hover:bg-purple-600">
+              <button
+                type="submit"
+                className="rounded-lg bg-purple-500 px-3 py-1.5 text-xs text-white transition-all duration-200 hover:bg-purple-600 active:scale-[0.98]"
+              >
                 ارسال پاسخ
               </button>
             </form>
@@ -126,9 +131,12 @@ export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest, viewer
       <h2 className="text-xl font-bold text-zinc-50">پاسخ‌ها</h2>
 
       {sortedTopLevel.length === 0 ? (
-        <p className="mt-3 rounded-xl border border-dashed border-white/15 bg-zinc-900/40 p-4 text-sm text-zinc-400">
-          هنوز پاسخی ثبت نشده. اولین پاسخ را تو بنویس.
-        </p>
+        <EmptyState
+          icon={MessageCirclePlus}
+          title="هنوز کسی اینجا نیومده. تو اولی باش."
+          actionHref={`/t/${topicId}#reply-form`}
+          actionLabel="نوشتن اولین پاسخ"
+        />
       ) : (
         <ul>
           {sortedTopLevel.map((reply) => (

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { toggleFollowUserAction } from "@/app/actions/forum";
 import { TopicFeed } from "@/components/topic/topic-feed";
+import { PersonalSky } from "@/components/profile/personal-sky";
 import { createClient } from "@/lib/supabase/server";
 import { formatJalali, formatRelative } from "@/lib/jalali";
 import { getPublicProfileByUsername, getRoleEmoji, getTopicsByAuthor } from "@/lib/forum-data";
@@ -66,7 +67,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               <input type="hidden" name="user_id" value={profile.id} />
               <button
                 type="submit"
-                className="inline-flex h-10 items-center rounded-xl bg-purple-500 px-4 text-sm font-medium text-white hover:bg-purple-600"
+                className="inline-flex h-10 items-center rounded-xl bg-purple-500 px-4 text-sm font-medium text-white transition-all duration-200 hover:bg-purple-600 active:scale-[0.98]"
               >
                 {isFollowing ? "لغو دنبال‌کردن" : "دنبال‌کردن"}
               </button>
@@ -81,7 +82,21 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
         </div>
       </section>
 
-      <section className="mt-6">
+      <PersonalSky
+        displayName={profile.displayName || profile.username}
+        topics={topics.map((topic) => ({
+          id: topic.id,
+          title: topic.title,
+          likeCount: topic.likeCount,
+          replyCount: topic.replyCount,
+          createdAt: topic.createdAt.toISOString(),
+          solved: topic.solved,
+          categoryName: topic.category,
+        }))}
+        isOwnProfile={Boolean(user && user.id === profile.id)}
+      />
+
+      <section className="mt-8">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-xl font-bold text-zinc-50">تاپیک‌های کاربر</h2>
           <Link href="/" className="text-sm text-purple-300 hover:text-purple-200">
