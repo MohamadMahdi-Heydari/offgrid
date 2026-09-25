@@ -28,6 +28,17 @@ export type FeedTopic = {
   type: "discussion" | "question";
 };
 
+export type TopicAuthor = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  role: string;
+  city: string | null;
+  job: string | null;
+  createdAt: Date;
+};
+
 export type TopicDetails = {
   id: string;
   title: string;
@@ -41,8 +52,7 @@ export type TopicDetails = {
   replyCount: number;
   createdAt: Date;
   authorId: string | null;
-  authorUsername: string;
-  authorRole: string;
+  author: TopicAuthor | null;
   categoryName: string;
   categorySlug: string;
 };
@@ -60,6 +70,8 @@ export type ReplyItem = {
   createdAt: Date;
   authorId: string | null;
   authorUsername: string;
+  authorDisplayName: string | null;
+  authorAvatarUrl: string | null;
   authorRole: string;
 };
 
@@ -301,7 +313,12 @@ export async function getTopicById(id: string) {
         ? supabase.from("categories").select("name,slug").eq("id", topic.category_id).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
       topic.author_id
-        ? supabase.from("profiles").select("username,role").eq("id", topic.author_id).limit(1).maybeSingle()
+        ? supabase
+            .from("profiles")
+            .select("id,username,display_name,avatar_url,role,city,job,created_at")
+            .eq("id", topic.author_id)
+            .limit(1)
+            .maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
 
@@ -324,8 +341,18 @@ export async function getTopicById(id: string) {
       replyCount: topic.reply_count ?? 0,
       createdAt: new Date(topic.created_at),
       authorId: topic.author_id,
-      authorUsername: authorResult.data?.username ?? "guest",
-      authorRole: authorResult.data?.role ?? "user",
+      author: authorResult.data
+        ? {
+            id: authorResult.data.id,
+            username: authorResult.data.username,
+            displayName: authorResult.data.display_name,
+            avatarUrl: authorResult.data.avatar_url,
+            role: authorResult.data.role,
+            city: authorResult.data.city,
+            job: authorResult.data.job,
+            createdAt: new Date(authorResult.data.created_at),
+          }
+        : null,
       categoryName: categoryResult.data?.name ?? "بدون دسته",
       categorySlug: categoryResult.data?.slug ?? "general",
     } satisfies TopicDetails;
@@ -354,8 +381,8 @@ export async function getRepliesByTopic(topicId: string) {
     const rows = data ?? [];
     const authorIds = [...new Set(rows.map((row) => row.author_id).filter(Boolean))] as string[];
     const { data: authors } = authorIds.length
-      ? await supabase.from("profiles").select("id,username,role").in("id", authorIds)
-      : { data: [] as { id: string; username: string; role: string }[] };
+      ? await supabase.from("profiles").select("id,username,display_name,avatar_url,role").in("id", authorIds)
+      : { data: [] as { id: string; username: string; display_name: string | null; avatar_url: string | null; role: string }[] };
 
     const authorMap = new Map((authors ?? []).map((author) => [author.id, author]));
 
@@ -375,6 +402,8 @@ export async function getRepliesByTopic(topicId: string) {
         createdAt: new Date(row.created_at),
         authorId: row.author_id,
         authorUsername: author?.username ?? "guest",
+        authorDisplayName: author?.display_name ?? null,
+        authorAvatarUrl: author?.avatar_url ?? null,
         authorRole: author?.role ?? "user",
       } satisfies ReplyItem;
     });

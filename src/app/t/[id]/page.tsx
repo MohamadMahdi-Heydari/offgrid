@@ -2,12 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getRepliesByTopic, getTopicById } from "@/lib/forum-data";
-import { RoleBadge } from "@/components/user/role-badge";
 import { renderMarkdown } from "@/lib/markdown";
-import { formatRelative } from "@/lib/jalali";
 import { createReplyAction } from "@/app/actions/forum";
 import { ReplyTree } from "@/components/reply/reply-tree";
 import { ReplyAnchorScroll } from "@/components/reply/reply-anchor-scroll";
+import { TopicAuthorCard } from "@/components/topic/topic-author-card";
 import { TopicReactionBar } from "@/components/topic/topic-reaction-bar";
 
 type TopicPageProps = {
@@ -62,11 +61,6 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
           <Link href={`/c/${topic.categorySlug}`} className="hover:text-purple-300">
             {topic.categoryName}
           </Link>
-          <span>•</span>
-          <RoleBadge role={topic.authorRole} size="sm" />
-          <span>@{topic.authorUsername}</span>
-          <span>•</span>
-          <span>{formatRelative(topic.createdAt)}</span>
         </div>
 
         <h1 className="text-[28px] font-bold text-zinc-50">{topic.title}</h1>
@@ -84,7 +78,9 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
           initialReaction={currentTopicReaction === 1 ? 1 : currentTopicReaction === -1 ? -1 : 0}
         />
 
-        <div className="mt-2 text-xs text-zinc-400">{topic.replyCount} پاسخ</div>
+        <TopicAuthorCard author={topic.author} topicCreatedAt={topic.createdAt} />
+
+        <div className="mt-3 text-xs text-zinc-400">{topic.replyCount} پاسخ</div>
       </article>
 
       <section id="reply-form" className="mt-6 scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/70 p-4">
@@ -120,6 +116,7 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
         bestReplyId={topic.bestReplyId}
         canSelectBest={canSelectBest}
         viewerReactions={viewerReplyReactions}
+        viewerId={user?.id ?? null}
       />
     </main>
   );

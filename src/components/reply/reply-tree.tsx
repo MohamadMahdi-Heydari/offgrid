@@ -1,11 +1,10 @@
 import { MessageCirclePlus } from "lucide-react";
 import { createReplyAction, selectBestReplyAction } from "@/app/actions/forum";
 import { renderMarkdown } from "@/lib/markdown";
-import { formatRelative } from "@/lib/jalali";
 import type { ReplyItem } from "@/lib/forum-data";
 import { LanternVote } from "@/components/reaction/lantern-vote";
 import { EmptyState } from "@/components/ui/empty-state";
-import { RoleBadge } from "@/components/user/role-badge";
+import { ReplyAuthor } from "@/components/reply/reply-author";
 import { ReplyCardLink } from "@/components/reply/reply-card-link";
 
 type ViewerReactions = Record<string, 1 | -1>;
@@ -16,6 +15,7 @@ type ReplyTreeProps = {
   bestReplyId: string | null;
   canSelectBest: boolean;
   viewerReactions: ViewerReactions;
+  viewerId: string | null;
 };
 
 function ReplyNode({
@@ -26,6 +26,7 @@ function ReplyNode({
   depth,
   isBest,
   viewerReactions,
+  viewerId,
 }: {
   reply: ReplyItem;
   allReplies: ReplyItem[];
@@ -34,6 +35,7 @@ function ReplyNode({
   depth: number;
   isBest: boolean;
   viewerReactions: ViewerReactions;
+  viewerId: string | null;
 }) {
   const children = allReplies
     .filter((item) => item.parentId === reply.id)
@@ -50,12 +52,16 @@ function ReplyNode({
             isBest ? "border-emerald-400/40" : "border-white/10"
           } bg-zinc-900/60 p-4`}
         >
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-            <RoleBadge role={reply.authorRole} size="sm" />
-            <span>@{reply.authorUsername}</span>
-            <span>•</span>
-            <span>{formatRelative(reply.createdAt)}</span>
-          </div>
+          <ReplyAuthor
+            author={{
+              username: reply.authorUsername,
+              displayName: reply.authorDisplayName,
+              avatarUrl: reply.authorAvatarUrl,
+              role: reply.authorRole,
+            }}
+            replyCreatedAt={reply.createdAt}
+            isMe={viewerId !== null && viewerId === reply.authorId}
+          />
 
           <div className="text-sm leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.body) }} />
 
@@ -118,6 +124,7 @@ function ReplyNode({
               depth={depth + 1}
               isBest={false}
               viewerReactions={viewerReactions}
+              viewerId={viewerId}
             />
           ))}
         </ul>
@@ -126,7 +133,7 @@ function ReplyNode({
   );
 }
 
-export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest, viewerReactions }: ReplyTreeProps) {
+export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest, viewerReactions, viewerId }: ReplyTreeProps) {
   const topLevel = replies.filter((reply) => !reply.parentId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const sortedTopLevel = topLevel.sort((a, b) => {
@@ -158,6 +165,7 @@ export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest, viewer
               depth={0}
               isBest={bestReplyId === reply.id}
               viewerReactions={viewerReactions}
+              viewerId={viewerId}
             />
           ))}
         </ul>
