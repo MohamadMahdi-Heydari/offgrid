@@ -1,13 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { toggleFollowUserAction } from "@/app/actions/forum";
 import { TopicFeed } from "@/components/topic/topic-feed";
 import { PersonalSky } from "@/components/profile/personal-sky";
 import { GuardianShield } from "@/components/brand/guardian-shield";
 import { NetworkGear } from "@/components/brand/network-gear";
 import { CreatorEmber } from "@/components/brand/creator-ember";
 import { RoleBadge } from "@/components/user/role-badge";
+import { FollowButton } from "@/components/profile/follow-button";
+import { FollowsStats } from "@/components/profile/follows-stats";
 import { createClient } from "@/lib/supabase/server";
 import { formatJalali, formatRelative } from "@/lib/jalali";
 import { getPublicProfileByUsername, getTopicsByAuthor } from "@/lib/forum-data";
@@ -30,12 +31,14 @@ const ROLE_ICONS = {
 
 type UserProfilePageProps = {
   params: Promise<{ username: string }>;
+  searchParams: Promise<{ follows?: string }>;
 };
 
 export const revalidate = 120;
 
-export default async function UserProfilePage({ params }: UserProfilePageProps) {
+export default async function UserProfilePage({ params, searchParams }: UserProfilePageProps) {
   const { username } = await params;
+  const query = await searchParams;
 
   const supabase = await createClient();
   const [profile, userResult] = await Promise.all([getPublicProfileByUsername(username), supabase.auth.getUser()]);
@@ -44,8 +47,8 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
 
   const user = userResult.data.user;
 
-  const [topics, followResult] = await Promise.all([
-    getTopicsByAuthor(profile.id, 20),
+  const [topics, followResult, followerCountResult, followingCountResult] = await Promise.all([
+    getTopicsByAuthor(profile.id, 50),
     user && user.id !== profile.id
       ? supabase
           .from("follows")
@@ -55,6 +58,8 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("following_id", profile.id),
+    supabase.from("follows").select("follower_id", { count: "exact", head: true }).eq("follower_id", profile.id),
   ]);
 
   const isFollowing = Boolean(followResult.data);
@@ -94,20 +99,22 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               </h1>
               <p className="text-sm text-zinc-400">@{profile.username}</p>
               <p className="mt-1 text-sm text-zinc-300">{profile.bio || "بیویی ثبت نشده."}</p>
+              <div className="mt-2">
+                <FollowsStats
+                  userId={profile.id}
+                  displayName={displayName}
+                  followerCount={followerCountResult.count ?? 0}
+                  followingCount={followingCountResult.count ?? 0}
+                  viewerId={user?.id ?? null}
+                  isOwner={isOwner}
+                  initialTab={query.follows === "followers" || query.follows === "following" ? query.follows : null}
+                />
+              </div>
             </div>
           </div>
 
-          {user && user.id !== profile.id ? (
-            <form action={toggleFollowUserAction}>
-              <input type="hidden" name="user_id" value={profile.id} />
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center rounded-xl bg-purple-500 px-4 text-sm font-medium text-white transition-all duration-200 hover:bg-purple-600 active:scale-[0.98]"
-              >
-                {isFollowing ? "لغو دنبال‌کردن" : "دنبال‌کردن"}
-              </button>
-            </form>
-          ) : null}
+          {/* مهمان هم دکمه را می‌بیند؛ کلیکش به /login هدایت می‌شود */}
+          {!isOwner ? <FollowButton targetUserId={profile.id} initialFollowing={isFollowing} size="md" /> : null}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-4 text-sm text-zinc-400">

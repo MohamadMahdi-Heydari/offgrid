@@ -6,6 +6,7 @@ import type { ReplyItem } from "@/lib/forum-data";
 import { LanternVote } from "@/components/reaction/lantern-vote";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RoleBadge } from "@/components/user/role-badge";
+import { ReplyCardLink } from "@/components/reply/reply-card-link";
 
 type ViewerReactions = Record<string, 1 | -1>;
 
@@ -38,19 +39,27 @@ function ReplyNode({
     .filter((item) => item.parentId === reply.id)
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
+  const anchorId = `reply-${reply.id}`;
+
   return (
     <li className="mt-4" style={{ marginInlineStart: `${depth * 24}px` }}>
-      <article className={`rounded-xl border ${isBest ? "border-emerald-400/40" : "border-white/10"} bg-zinc-900/60 p-4`}>
-        <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-          <RoleBadge role={reply.authorRole} size="sm" />
-          <span>@{reply.authorUsername}</span>
-          <span>•</span>
-          <span>{formatRelative(reply.createdAt)}</span>
-        </div>
+      <ReplyCardLink href={`/t/${topicId}#${anchorId}`}>
+        <article
+          id={anchorId}
+          className={`scroll-mt-24 rounded-xl border transition-[box-shadow] duration-500 ${
+            isBest ? "border-emerald-400/40" : "border-white/10"
+          } bg-zinc-900/60 p-4`}
+        >
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+            <RoleBadge role={reply.authorRole} size="sm" />
+            <span>@{reply.authorUsername}</span>
+            <span>•</span>
+            <span>{formatRelative(reply.createdAt)}</span>
+          </div>
 
-        <div className="text-sm leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.body) }} />
+          <div className="text-sm leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.body) }} />
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div data-reply-nolink className="mt-3 flex flex-wrap items-center gap-2">
           <LanternVote
             targetType="reply"
             targetId={reply.id}
@@ -93,8 +102,9 @@ function ReplyNode({
               </button>
             </form>
           </details>
-        </div>
-      </article>
+          </div>
+        </article>
+      </ReplyCardLink>
 
       {children.length > 0 ? (
         <ul>

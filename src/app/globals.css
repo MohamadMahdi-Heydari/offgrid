@@ -214,6 +214,15 @@ select {
   animation: ember-ring-pulse 3s ease-in-out infinite;
 }
 
+/* ===== هایلایت انکر پاسخ ===== */
+
+/* هاله‌ی بنفش پاسخ هدف — با حذف کلاس، به‌آرامی محو می‌شود */
+.reply-anchor-highlight {
+  box-shadow:
+    0 0 0 2px rgba(168, 85, 247, 0.55),
+    0 0 28px -6px rgba(168, 85, 247, 0.45);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lantern-hero-glow,
   .lantern-lit .lantern-flame,

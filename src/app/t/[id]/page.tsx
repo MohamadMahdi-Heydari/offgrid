@@ -7,6 +7,7 @@ import { renderMarkdown } from "@/lib/markdown";
 import { formatRelative } from "@/lib/jalali";
 import { createReplyAction } from "@/app/actions/forum";
 import { ReplyTree } from "@/components/reply/reply-tree";
+import { ReplyAnchorScroll } from "@/components/reply/reply-anchor-scroll";
 import { TopicReactionBar } from "@/components/topic/topic-reaction-bar";
 
 type TopicPageProps = {
@@ -53,6 +54,7 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
+      <ReplyAnchorScroll />
       {query.error ? <p className="mb-4 rounded-xl bg-red-500/15 p-3 text-sm text-red-300">{query.error}</p> : null}
 
       <article className="rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/80 p-6">

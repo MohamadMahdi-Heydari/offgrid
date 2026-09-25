@@ -42,8 +42,8 @@ const bestReplySchema = z.object({
   replyId: z.string().uuid(),
 });
 
-const followSchema = z.object({
-  userId: z.string().uuid(),
+const followTargetSchema = z.object({
+  targetUserId: z.string().uuid("شناسه کاربر نامعتبر است"),
 });
 
 function toSlug(text: string) {
@@ -381,37 +381,162 @@ export async function selectBestReplyAction(formData: FormData) {
   }
 }
 
-export async function toggleFollowUserAction(formData: FormData) {
+export type ToggleFollowResult = {
+  following: boolean;
+  followerCount: number;
+};
+
+/**
+ * دنبال/لغو دنبال کردن یک کاربر. خروجی وضعیت تازه + تعداد دنبال‌کننده‌های هدف.
+ */
+export async function toggleFollowUserAction(input: { targetUserId: string }): Promise<ToggleFollowResult> {
   try {
+    const { targetUserId } = followTargetSchema.parse(input);
+
     const supabase = await createClient();
-    const userResult = await supabase.auth.getUser();
-    const currentUser = userResult.data.user;
-    if (!currentUser) redirect("/login");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const parsed = followSchema.safeParse({ userId: formData.get("user_id") });
-    if (!parsed.success) return;
+    if (!user) redirect("/login");
 
-    const { userId } = parsed.data;
-
-    if (currentUser.id === userId) return;
+    if (user.id === targetUserId) {
+      throw new Error("نمی‌تونی خودت رو دنبال کنی");
+    }
 
     const { data: existing } = await supabase
       .from("follows")
       .select("follower_id")
-      .eq("follower_id", currentUser.id)
-      .eq("following_id", userId)
+      .eq("follower_id", user.id)
+      .eq("following_id", targetUserId)
       .limit(1)
       .maybeSingle();
 
+    let following: boolean;
+
     if (existing) {
-      await supabase.from("follows").delete().eq("follower_id", currentUser.id).eq("following_id", userId);
+      const { error } = await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", targetUserId);
+      if (error) {
+        console.error("toggleFollowUserAction delete error", error);
+        throw new Error("لغو دنبال‌کردن انجام نشد؛ دوباره تلاش کن");
+      }
+      following = false;
     } else {
-      await supabase.from("follows").insert({ follower_id: currentUser.id, following_id: userId });
+      const { error } = await supabase.from("follows").insert({ follower_id: user.id, following_id: targetUserId });
+      if (error) {
+        console.error("toggleFollowUserAction insert error", error);
+        throw new Error(error.code === "23505" ? "قبلاً دنبالش کرده‌ای" : "دنبال‌کردن انجام نشد؛ دوباره تلاش کن");
+      }
+      following = true;
     }
 
+    const { count } = await supabase
+      .from("follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("following_id", targetUserId);
+
+    const { data: targetProfile } = await supabase.from("profiles").select("username").eq("id", targetUserId).limit(1).maybeSingle();
+
     revalidatePath("/");
+    if (targetProfile?.username) {
+      revalidatePath(`/u/${targetProfile.username}`);
+    }
+
+    return { following, followerCount: typeof count === "number" ? count : 0 };
   } catch (error) {
     unstable_rethrow(error);
     console.error("toggleFollowUserAction unexpected", error);
+    throw error instanceof Error ? error : new Error("دنبال‌کردن انجام نشد؛ دوباره تلاش کن");
+  }
+}
+
+const followListSchema = z.object({
+  userId: z.string().uuid("شناسه کاربر نامعتبر است"),
+  kind: z.enum(["followers", "following"]),
+  offset: z.number().int().min(0).default(0),
+});
+
+export type FollowListUser = {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  role: string;
+};
+
+export type FollowListResult = {
+  users: FollowListUser[];
+  total: number;
+  viewerFollowingIds: string[];
+};
+
+const FOLLOW_LIST_PAGE_SIZE = 50;
+
+/** لیست دنبال‌کنندگان/دنبال‌شده‌ها برای مودال پروفایل — عمومی (بدون نیاز به ورود). */
+export async function getFollowListAction(input: {
+  userId: string;
+  kind: "followers" | "following";
+  offset?: number;
+}): Promise<FollowListResult> {
+  try {
+    const { userId, kind, offset } = followListSchema.parse(input);
+
+    const supabase = await createClient();
+
+    const idColumn = kind === "followers" ? "follower_id" : "following_id";
+    const filterColumn = kind === "followers" ? "following_id" : "follower_id";
+
+    const { data: followRows, count, error: followError } = await supabase
+      .from("follows")
+      .select(idColumn, { count: "exact" })
+      .eq(filterColumn, userId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + FOLLOW_LIST_PAGE_SIZE - 1);
+
+    if (followError) {
+      console.error("getFollowListAction follows error", followError);
+      throw new Error("دریافت لیست انجام نشد؛ دوباره تلاش کن");
+    }
+
+    const userIds = (followRows ?? []).map((row) => row[idColumn as keyof typeof row] as string);
+
+    if (userIds.length === 0) {
+      return { users: [], total: typeof count === "number" ? count : 0, viewerFollowingIds: [] };
+    }
+
+    const {
+      data: { user: viewer },
+    } = await supabase.auth.getUser();
+
+    const [{ data: profileRows }, { data: viewerRows }] = await Promise.all([
+      supabase.from("profiles").select("id,username,display_name,avatar_url,role").in("id", userIds),
+      viewer
+        ? supabase.from("follows").select("following_id").eq("follower_id", viewer.id).in("following_id", userIds)
+        : Promise.resolve({ data: [] as { following_id: string }[] }),
+    ]);
+
+    const profileMap = new Map((profileRows ?? []).map((profile) => [profile.id, profile]));
+    const orderedUsers = userIds
+      .map((id) => profileMap.get(id))
+      .filter((profile): profile is NonNullable<typeof profile> => Boolean(profile))
+      .map((profile) => ({
+        id: profile.id,
+        username: profile.username,
+        displayName: profile.display_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role,
+      }));
+
+    const viewerFollowingIds = (viewerRows ?? []).map((row) => row.following_id);
+
+    return {
+      users: orderedUsers,
+      total: typeof count === "number" ? count : orderedUsers.length,
+      viewerFollowingIds,
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    console.error("getFollowListAction unexpected", error);
+    throw error instanceof Error ? error : new Error("دریافت لیست انجام نشد؛ دوباره تلاش کن");
   }
 }
