@@ -69,16 +69,21 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
           <p className="mt-3 rounded-xl border border-sky-400/30 bg-sky-500/10 p-3 text-sm text-sky-200">{topic.questionContext}</p>
         ) : null}
 
-        <div className="mt-4 text-[15px] leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(topic.body) }} />
+        {/* چیدمان انجمنی: ستون نویسنده سمت راست (RTL)، محتوا سمت چپ */}
+        <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-stretch md:gap-6">
+          <TopicAuthorCard author={topic.author} topicCreatedAt={topic.createdAt} />
 
-        <TopicReactionBar
-          topicId={topic.id}
-          initialLikeCount={topic.likeCount}
-          initialDislikeCount={topic.dislikeCount}
-          initialReaction={currentTopicReaction === 1 ? 1 : currentTopicReaction === -1 ? -1 : 0}
-        />
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(topic.body) }} />
 
-        <TopicAuthorCard author={topic.author} topicCreatedAt={topic.createdAt} />
+            <TopicReactionBar
+              topicId={topic.id}
+              initialLikeCount={topic.likeCount}
+              initialDislikeCount={topic.dislikeCount}
+              initialReaction={currentTopicReaction === 1 ? 1 : currentTopicReaction === -1 ? -1 : 0}
+            />
+          </div>
+        </div>
 
         <div className="mt-3 text-xs text-zinc-400">{topic.replyCount} پاسخ</div>
       </article>
