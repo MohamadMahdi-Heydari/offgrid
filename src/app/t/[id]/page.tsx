@@ -9,6 +9,7 @@ import { ReplyAnchorScroll } from "@/components/reply/reply-anchor-scroll";
 import { TopicAuthorCard } from "@/components/topic/topic-author-card";
 import { TopicInfoPopover } from "@/components/topic/topic-info-popover";
 import { TopicReactionBar } from "@/components/topic/topic-reaction-bar";
+import { ReplyCountDivider } from "@/components/reply/reply-count-divider";
 
 type TopicPageProps = {
   params: Promise<{ id: string }>;
@@ -113,7 +114,9 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
         <div className="mt-3 text-xs text-zinc-400">{topic.replyCount} پاسخ</div>
       </article>
 
-      <section id="reply-form" className="mt-6 scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/70 p-4">
+      <ReplyCountDivider count={topic.replyCount} />
+
+      <section id="reply-form" className="scroll-mt-20 rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/70 p-4">
         <h2 className="text-lg font-semibold text-zinc-100">پاسخ جدید</h2>
         {!user ? (
           <p className="mt-2 text-sm text-zinc-400">

@@ -16,6 +16,8 @@ type ReplyTreeProps = {
   canSelectBest: boolean;
   viewerReactions: ViewerReactions;
   viewerId: string | null;
+  /** id سکشن لیست — برای انکر #replies پایین کارت‌ها */
+  clipId?: string;
 };
 
 function ReplyNode({
@@ -147,7 +149,15 @@ function ReplyNode({
   );
 }
 
-export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest, viewerReactions, viewerId }: ReplyTreeProps) {
+export function ReplyTree({
+  topicId,
+  replies,
+  bestReplyId,
+  canSelectBest,
+  viewerReactions,
+  viewerId,
+  clipId = "replies",
+}: ReplyTreeProps) {
   const topLevel = replies.filter((reply) => !reply.parentId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const sortedTopLevel = topLevel.sort((a, b) => {
@@ -157,7 +167,7 @@ export function ReplyTree({ topicId, replies, bestReplyId, canSelectBest, viewer
   });
 
   return (
-    <section className="mt-6">
+    <section id={clipId} className="mt-6">
       <h2 className="text-xl font-bold text-zinc-50">پاسخ‌ها</h2>
 
       {sortedTopLevel.length === 0 ? (
