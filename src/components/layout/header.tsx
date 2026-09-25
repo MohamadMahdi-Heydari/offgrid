@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Bell, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { OffgridLogo } from "@/components/brand/offgrid-logo";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { NotificationBell } from "@/components/layout/notification-bell";
+import { getUnreadCountAction } from "@/app/actions/notifications";
 import { createClient } from "@/lib/supabase/server";
 import { logoutAction } from "@/app/actions/auth";
 
@@ -17,6 +19,7 @@ export async function Header() {
 
   const emailConfirmedAt = (user as { email_confirmed_at?: string | null } | null)?.email_confirmed_at ?? null;
   const newTopicHref = !user ? "/login" : !emailConfirmedAt ? "/verify-email?notice=برای%20ساخت%20تاپیک%20ابتدا%20ایمیلت%20را%20تأیید%20کن" : "/new";
+  const unreadCount = user ? await getUnreadCountAction() : 0;
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[color:var(--background)]/80 backdrop-blur-xl">
@@ -44,14 +47,7 @@ export async function Header() {
           <span className="hidden sm:inline">تاپیک جدید</span>
         </Link>
 
-        <button
-          type="button"
-          aria-label="اعلان‌ها (به‌زودی)"
-          title="به‌زودی"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-zinc-300 transition-all duration-200 hover:bg-white/10 hover:text-white"
-        >
-          <Bell className="h-5 w-5" strokeWidth={1.5} />
-        </button>
+        {user ? <NotificationBell initialUnreadCount={unreadCount} /> : null}
 
         <ThemeToggle />
 
