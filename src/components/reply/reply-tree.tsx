@@ -42,9 +42,9 @@ function ReplyNode({
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const anchorId = `reply-${reply.id}`;
-  // از عمق ۳ به بعد فضا تنگ می‌شود: به‌جای ستون، نوار افقی باریک تمام‌عرض می‌آید
+  // از عمق ۳ به بعد فضا تنگ می‌شود: به‌جای جعبه‌ی ستونی، کارت افقی باریک تمام‌عرض می‌آید
   const compact = depth >= 3;
-  const asideWidth = depth === 0 ? "md:w-32" : depth === 1 ? "md:w-24" : "md:w-20";
+  const asideWidth = depth <= 1 ? "md:w-32" : "md:w-20";
   const authorProp = {
     username: reply.authorUsername,
     displayName: reply.authorDisplayName,
@@ -56,25 +56,26 @@ function ReplyNode({
   return (
     <li className="mt-4" style={{ marginInlineStart: `${depth * 24}px` }}>
       <ReplyCardLink href={`/t/${topicId}#${anchorId}`}>
-        <article
-          id={anchorId}
-          className={`scroll-mt-24 rounded-xl border transition-[box-shadow] duration-500 ${
-            isBest ? "border-emerald-400/40" : "border-white/10"
-          } bg-zinc-900/60 p-4 ${compact ? "" : "md:flex md:flex-row md:gap-3"}`}
-        >
-          {/* ستون نویسنده — فقط دسکتاپ و تا عمق ۲؛ اولین فرزند flex یعنی سمت راست در RTL */}
+        <div className={`flex flex-col gap-2.5 ${compact ? "" : "md:flex-row md:gap-3"}`}>
+          {/* جعبه‌ی مستقل نویسنده — اولین فرزند flex یعنی سمت راست در RTL */}
           {!compact ? (
-            <aside className={`hidden shrink-0 md:block ${asideWidth}`}>
+            <div className={`hidden shrink-0 md:block ${asideWidth}`}>
               <ReplyAuthor author={authorProp} replyCreatedAt={reply.createdAt} isMe={isMe} depth={depth} variant="column" />
-            </aside>
+            </div>
           ) : null}
 
-          <div className="min-w-0 flex-1">
-            {/* نوار افقی — موبایل، یا عمق ۳+ روی همه‌ی بازه‌ها */}
-            <div className={compact ? "" : "md:hidden"}>
-              <ReplyAuthor author={authorProp} replyCreatedAt={reply.createdAt} isMe={isMe} depth={depth} variant="strip" />
-            </div>
+          {/* کارت افقی نویسنده — موبایل، یا عمق ۳+ روی همه‌ی بازه‌ها */}
+          <div className={compact ? "" : "md:hidden"}>
+            <ReplyAuthor author={authorProp} replyCreatedAt={reply.createdAt} isMe={isMe} depth={depth} variant="strip" />
+          </div>
 
+          {/* جعبه‌ی مستقل محتوا — انکر و هایلایت بنفش روی همین است */}
+          <article
+            id={anchorId}
+            className={`min-w-0 flex-1 scroll-mt-24 rounded-2xl border bg-zinc-900/50 p-4 transition-[box-shadow] duration-500 ${
+              isBest ? "border-emerald-400/40" : "border-white/10"
+            }`}
+          >
             <div className="text-sm leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.body) }} />
 
             <div data-reply-nolink className="mt-3 flex flex-wrap items-center gap-2">
@@ -121,8 +122,8 @@ function ReplyNode({
             </form>
           </details>
             </div>
-          </div>
-        </article>
+          </article>
+        </div>
       </ReplyCardLink>
 
       {children.length > 0 ? (

@@ -56,7 +56,7 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
       <ReplyAnchorScroll />
       {query.error ? <p className="mb-4 rounded-xl bg-red-500/15 p-3 text-sm text-red-300">{query.error}</p> : null}
 
-      <article className="rounded-2xl border border-[var(--border)] bg-[color:var(--surface)]/80 p-6">
+      <article>
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
           <Link href={`/c/${topic.categorySlug}`} className="hover:text-purple-300">
             {topic.categoryName}
@@ -69,11 +69,11 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
           <p className="mt-3 rounded-xl border border-sky-400/30 bg-sky-500/10 p-3 text-sm text-sky-200">{topic.questionContext}</p>
         ) : null}
 
-        {/* چیدمان انجمنی: ستون نویسنده سمت راست (RTL)، محتوا سمت چپ */}
-        <div className="mt-4 flex flex-col gap-5 md:flex-row md:items-stretch md:gap-6">
+        {/* دو جعبه‌ی مستقل: نویسنده سمت راست (RTL)، محتوا سمت چپ */}
+        <div className="mt-4 flex flex-col gap-4 md:flex-row">
           <TopicAuthorCard author={topic.author} topicCreatedAt={topic.createdAt} />
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-zinc-900/50 p-5">
             <div className="text-[15px] leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(topic.body) }} />
 
             <TopicReactionBar
