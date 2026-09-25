@@ -55,6 +55,12 @@ export type TopicDetails = {
   author: TopicAuthor | null;
   categoryName: string;
   categorySlug: string;
+  /** شمار تگ‌های تاپیک (اگر RLS جلوی خواندن را بگیرد، ۰) */
+  tagCount: number;
+  bodyCharacterCount: number;
+  /** فعلاً در اسکیما نیست؛ اگر بعداً اضافه شود همین‌جا پر می‌شود */
+  updatedAt: Date | null;
+  editCount: number;
 };
 
 export type ReplyItem = {
@@ -293,7 +299,7 @@ export async function getTopicsByCategory(slug: string, limit = 20) {
   }
 }
 
-export async function getTopicById(id: string) {
+export async function getTopicById(id: string): Promise<TopicDetails | null> {
   try {
     const supabase = createSupabasePublicClient();
     const { data: topic, error } = await supabase
@@ -308,7 +314,7 @@ export async function getTopicById(id: string) {
 
     if (error || !topic) return null;
 
-    const [categoryResult, authorResult] = await Promise.all([
+    const [categoryResult, authorResult, topicTagCountResult] = await Promise.all([
       topic.category_id
         ? supabase.from("categories").select("name,slug").eq("id", topic.category_id).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -320,7 +326,11 @@ export async function getTopicById(id: string) {
             .limit(1)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      // ممکن است RLS خواندن topic_tags را باز نکرده باشد؛ آن‌وقت count با null برمی‌گردد و ۰ می‌شود
+      supabase.from("topic_tags").select("tag_id", { count: "exact", head: true }).eq("topic_id", topic.id),
     ]);
+
+    const tagCount = typeof topicTagCountResult.count === "number" ? topicTagCountResult.count : 0;
 
     // شمارنده‌های لایک/دیسلایک توسط تریگر reactions_like_count_trigger روی سطر
     // تاپیک به‌روز نگه داشته می‌شوند؛ خواندن مستقیم جدول reactions با نقش anon
@@ -355,6 +365,11 @@ export async function getTopicById(id: string) {
         : null,
       categoryName: categoryResult.data?.name ?? "بدون دسته",
       categorySlug: categoryResult.data?.slug ?? "general",
+      tagCount,
+      bodyCharacterCount: topic.body.length,
+      // جدول topics فعلاً ستون updated_at ندارد؛ اگر بعداً اضافه شود اینجا پر می‌شود
+      updatedAt: null,
+      editCount: 0,
     } satisfies TopicDetails;
   } catch (error) {
     console.error("getTopicById unexpected", error);

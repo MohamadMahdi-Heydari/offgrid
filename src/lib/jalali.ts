@@ -14,3 +14,8 @@ export function formatRelative(date: string | Date) {
 export function formatJalali(date: string | Date) {
   return dayjs(date).calendar("jalali").locale("fa").format("YYYY/MM/DD");
 }
+
+/** تاریخ و ساعت شمسی — «۱۴۰۵/۰۶/۳۰ · ۱۴:۳۲» */
+export function formatJalaliDateTime(date: string | Date) {
+  return dayjs(date).calendar("jalali").locale("fa").format("YYYY/MM/DD · HH:mm");
+}

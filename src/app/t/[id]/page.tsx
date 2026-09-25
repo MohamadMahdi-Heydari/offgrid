@@ -7,6 +7,7 @@ import { createReplyAction } from "@/app/actions/forum";
 import { ReplyTree } from "@/components/reply/reply-tree";
 import { ReplyAnchorScroll } from "@/components/reply/reply-anchor-scroll";
 import { TopicAuthorCard } from "@/components/topic/topic-author-card";
+import { TopicInfoPopover } from "@/components/topic/topic-info-popover";
 import { TopicReactionBar } from "@/components/topic/topic-reaction-bar";
 
 type TopicPageProps = {
@@ -69,12 +70,36 @@ export default async function TopicPage({ params, searchParams }: TopicPageProps
           <p className="mt-3 rounded-xl border border-sky-400/30 bg-sky-500/10 p-3 text-sm text-sky-200">{topic.questionContext}</p>
         ) : null}
 
-        {/* دو جعبه‌ی مستقل: نویسنده سمت راست (RTL)، محتوا سمت چپ */}
-        <div className="mt-4 flex flex-col gap-4 md:flex-row">
-          <TopicAuthorCard author={topic.author} topicCreatedAt={topic.createdAt} />
+        {/*
+          بیرونزدگی: از ۱۲۸۰px به بالا کارت نویسنده به‌طور مطلق بیرون از قاب محتوا می‌نشیند.
+          هندسه‌ی ایمن: w-40 + فاصله‌ی ۱۶px تا قاب = ۱۷۶px فضای لازم در حاشیه‌ی ~۱۹۲px مخزن max-w-4xl.
+          زیر ۱۲۸۰px: فالبک — همان جعبه به شکل نوار فشرده‌ی افقی بالای کارت می‌آید.
+        */}
+        <div className="relative mt-4">
+          <div className="absolute -right-44 top-0 z-10 hidden w-40 xl:block">
+            <TopicAuthorCard author={topic.author} topicCreatedAt={topic.createdAt} variant="column" />
+          </div>
 
-          <div className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-zinc-900/50 p-5">
-            <div className="text-[15px] leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(topic.body) }} />
+          <div className="mb-3 xl:hidden">
+            <TopicAuthorCard author={topic.author} topicCreatedAt={topic.createdAt} variant="strip" />
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-5">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1 text-[15px] leading-relaxed text-zinc-200" dangerouslySetInnerHTML={{ __html: renderMarkdown(topic.body) }} />
+              <TopicInfoPopover
+                info={{
+                  authorDisplayName: topic.author?.displayName || topic.author?.username || "مهمان",
+                  authorUsername: topic.author?.username ?? "guest",
+                  categoryName: topic.categoryName,
+                  createdAt: topic.createdAt.toISOString(),
+                  updatedAt: topic.updatedAt ? topic.updatedAt.toISOString() : null,
+                  editCount: topic.editCount,
+                  tagCount: topic.tagCount,
+                  bodyCharacterCount: topic.bodyCharacterCount,
+                }}
+              />
+            </div>
 
             <TopicReactionBar
               topicId={topic.id}
